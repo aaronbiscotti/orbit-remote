@@ -4,8 +4,8 @@ A rounded, minimalist native remote-PC app for Windows → Mac. The Windows comp
 
 ## First test
 
-1. On the PC, run `scripts/start-host.ps1` after building the host. Orbit Host should be running. Choose an admin username and a password of at least 12 characters in **Authorize your Mac**, then click **Create login**. For subsequent launches, use **Unlock**.
-2. Download **Orbit-Client-macOS** from the latest successful [GitHub Actions build](https://github.com/aaronbiscotti/orbit-remote/actions/workflows/build.yml), unzip the artifact and then `Orbit-macOS.zip`, and move `Orbit.app` to Applications. It supports Apple Silicon and Intel Macs running macOS 13 or newer. This is a development build, locally signed, not Apple-notarized. If macOS blocks it, use the standard Privacy & Security “Open Anyway” flow for this app. Do not disable Gatekeeper globally.
+1. On the PC, Orbit Host is already running in this project's local checkout. For a portable installation, download `Orbit-Host-Windows.zip` from the [private release](https://github.com/aaronbiscotti/orbit-remote/releases/tag/v0.1.0), extract it, and open **Launch Orbit.cmd**. Choose an admin username and a password of at least 12 characters in **Authorize your Mac**, then click **Create login**. For subsequent launches, use **Unlock**. Click **Enable connections** and approve the Windows administrator prompt.
+2. Download `Orbit-macOS.zip` from the [private release](https://github.com/aaronbiscotti/orbit-remote/releases/tag/v0.1.0), extract it on the Mac, and move `Orbit.app` to Applications. It supports Apple Silicon and Intel Macs running macOS 13 or newer. This is a development build, locally signed, not Apple-notarized. If macOS blocks it, use the standard Privacy & Security “Open Anyway” flow for this app. Do not disable Gatekeeper globally.
 3. With both devices on the same network, click **Add PC** in Orbit on the Mac and enter the address shown on Orbit Host. Click the PC card. The Mac displays a four-digit pairing code.
 4. On the PC, select the pending Mac and enter that code, then click **Pair**. The host validates the cryptographic handshake; a wrong code fails. Your client saves its device certificate for future connections.
 5. On the Mac, click your PC and select **Desktop**. Use **Settings** to adjust resolution, frame rate, bitrate, and the decoder. The footer says **Requested**; it does not claim a measured 120 fps. Use Control+Option+Shift+S to toggle the streaming statistics overlay. Control+Option+Shift+Q disconnects.
@@ -15,6 +15,8 @@ The client is a native Qt application, not a Swift client. Hardware decoding on 
 ## While away
 
 Install [Tailscale](https://tailscale.com/download) on the PC and Mac, sign in to the same account, and enter the PC's Tailscale address in **Add PC**. Use `tailscale ping <pc>` on the Mac to verify a direct connection. Relay connections can be too slow for high-bitrate video. No router port forwarding is configured. Sunshine's admin interface is limited to localhost; you manage device authorization locally on the PC.
+
+For your personal devices, use a personal account whose tailnet you control. A school or employer domain may place you in a shared organization tailnet with its own administrators and access policies. See [Tailscale's device visibility explanation](https://tailscale.com/docs/concepts/device-visibility).
 
 The PC must stay powered, logged into an interactive desktop, and awake. Orbit Host includes an optional keep-awake checkbox, released when its window closes. This initial portable host is not a Windows service; it does not provide reliable access to the login screen after reboot or UAC secure desktop. Autorun, wake-on-LAN and service installation are future work. Sunshine continues running after closing the companion; `scripts/stop-host.ps1` stops this project's instance.
 
