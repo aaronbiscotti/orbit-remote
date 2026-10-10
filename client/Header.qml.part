@@ -26,6 +26,17 @@
             }
             Item { Layout.fillWidth: true }
             Button {
+                text: qsTr("Performance")
+                visible: stackView.depth === 1
+                onClicked: performanceMenu.open()
+                background: Rectangle { radius: 18; color: parent.hovered ? "#35405B" : "#283149" }
+                Menu {
+                    id: performanceMenu
+                    MenuItem { text: qsTr("Stable · 60 fps"); onTriggered: applyFastProfile(60, 8000) }
+                    MenuItem { text: qsTr("Fast · 120 fps"); onTriggered: applyFastProfile(120, 12000) }
+                }
+            }
+            Button {
                 text: qsTr("Add PC")
                 onClicked: addPcDialog.open()
                 background: Rectangle { radius: 18; color: parent.hovered ? "#35405B" : "#283149" }
@@ -40,6 +51,21 @@
             }
         }
     }
+    function applyFastProfile(fps, bitrate) {
+        StreamingPreferences.width = 1920
+        StreamingPreferences.height = 1080
+        StreamingPreferences.fps = fps
+        StreamingPreferences.bitrateKbps = bitrate
+        StreamingPreferences.enableVsync = false
+        StreamingPreferences.framePacing = false
+        StreamingPreferences.enableHdr = false
+        StreamingPreferences.enableYUV444 = false
+        StreamingPreferences.absoluteMouseMode = true
+        StreamingPreferences.videoCodecConfig = StreamingPreferences.VCC_FORCE_H264
+        StreamingPreferences.videoDecoderSelection = StreamingPreferences.VDS_FORCE_HARDWARE
+        if (Qt.platform.os === "osx") StreamingPreferences.rendererSelection = StreamingPreferences.RS_METAL
+        StreamingPreferences.save()
+    }
     footer: Rectangle {
         height: 54
         color: "#101218"
@@ -50,6 +76,6 @@
                 color: "#929CB4"; font.pointSize: 10
             }
             Item { Layout.fillWidth: true }
-            Label { text: qsTr("Powered by Moonlight"); color: "#697389"; font.pointSize: 10 }
+            Label { text: qsTr("Single display"); color: "#929CB4"; font.pointSize: 10 }
         }
     }

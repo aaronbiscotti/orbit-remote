@@ -1,4 +1,4 @@
-"""Apply a reproducible UI overlay without changing the streaming/authentication engine."""
+"""Apply pinned UI, input, and low-latency overlays. Remote authentication stays upstream."""
 from pathlib import Path
 import subprocess
 import sys
@@ -56,8 +56,25 @@ def overlays():
     cpp = replace(cpp, 'QCoreApplication::setOrganizationName("Moonlight Game Streaming Project");', 'QCoreApplication::setOrganizationName("Orbit Remote");')
     cpp = replace(cpp, 'QCoreApplication::setOrganizationDomain("moonlight-stream.com");', 'QCoreApplication::setOrganizationDomain("orbit.local");')
     cpp = replace(cpp, 'QCoreApplication::setApplicationName("Moonlight");', 'QCoreApplication::setApplicationName("Orbit");')
+    # Reapply upstream keyboard behavior after removing the experimental display remap.
+    keyboard = original("app/streaming/input/keyboard.cpp")
+    inputs = original("app/streaming/input/input.h")
+    input_cpp = original("app/streaming/input/input.cpp")
+    input_cpp = replace(input_cpp, "m_MouseCursorCapturedVisibilityState(SDL_DISABLE),", "m_MouseCursorCapturedVisibilityState(prefs.absoluteMouseMode ? SDL_ENABLE : SDL_DISABLE),")
+    pacer_header = original("app/streaming/video/ffmpeg-renderers/pacer/pacer.h")
+    pacer_header = replace(pacer_header, "bool m_Stopping;", "bool m_Stopping;\n    bool m_LatestFrameOnly;")
+    pacer = original("app/streaming/video/ffmpeg-renderers/pacer/pacer.cpp")
+    pacer = replace(pacer, '#include "pacer.h"', '#include "pacer.h"\n#include "settings/streamingpreferences.h"')
+    pacer = replace(pacer, "m_Stopping(false),", "m_Stopping(false),\n    m_LatestFrameOnly(false),")
+    pacer = replace(pacer, "    m_MaxVideoFps = maxVideoFps;", "    m_LatestFrameOnly = !enablePacing && !StreamingPreferences::get()->enableVsync;\n    m_MaxVideoFps = maxVideoFps;\n    if (m_LatestFrameOnly) SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, \"Orbit low latency: newest decoded frame only\");")
+    pacer = replace(pacer, "    if (m_RendererAttributes & RENDERER_ATTRIBUTE_NO_BUFFERING) {", "    if (m_LatestFrameOnly) {\n        // Keep the newest waiting frame for the next render, without accumulating latency.\n        frameDropTarget = 1;\n    }\n    else if (m_RendererAttributes & RENDERER_ATTRIBUTE_NO_BUFFERING) {")
+    pacer = replace(pacer, "    if (queue.size() == MAX_QUEUED_FRAMES) {\n        AVFrame* frame = queue.dequeue();\n        av_frame_free(&frame);\n    }", "    const int limit = m_LatestFrameOnly ? 1 : MAX_QUEUED_FRAMES;\n    while (queue.size() >= limit) {\n        AVFrame* frame = queue.dequeue();\n        // Count renderer backlog separately from network packet loss.\n        m_VideoStats->pacerDroppedFrames++;\n        av_frame_free(&frame);\n    }")
     return {"app/gui/main.qml": main, "app/gui/PcView.qml": pc, "app/gui/NavigableDialog.qml": dialog,
-            "app/settings/streamingpreferences.cpp": prefs, "app/main.cpp": cpp}
+            "app/settings/streamingpreferences.cpp": prefs, "app/main.cpp": cpp,
+            "app/streaming/input/keyboard.cpp": keyboard, "app/streaming/input/input.h": inputs,
+            "app/streaming/input/input.cpp": input_cpp,
+            "app/streaming/video/ffmpeg-renderers/pacer/pacer.cpp": pacer,
+            "app/streaming/video/ffmpeg-renderers/pacer/pacer.h": pacer_header}
 
 
 if __name__ == "__main__":
