@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -27,7 +28,7 @@ public partial class MainWindow : Window
         ComputerName.Text = Environment.MachineName;
         timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         timer.Tick += async (_, _) => await Refresh();
-        Loaded += async (_, _) => { await Refresh(); timer.Start(); };
+        Loaded += async (_, _) => { await Refresh(); ContentScroll.ScrollToTop(); timer.Start(); };
         Closed += (_, _) => { timer.Stop(); api?.Dispose(); SetThreadExecutionState(0x80000000); };
     }
 
@@ -42,6 +43,13 @@ public partial class MainWindow : Window
     }
     private string Runtime => Path.Combine(root, "runtime", "sunshine", "Sunshine");
     private string Certificate => Path.Combine(Runtime, "config", "credentials", "cacert.pem");
+    private bool HasAdminLogin()
+    {
+        var stateFile = Path.Combine(Runtime, "config", "sunshine_state.json");
+        if (!File.Exists(stateFile)) return false;
+        using var document = JsonDocument.Parse(File.ReadAllText(stateFile));
+        return document.RootElement.TryGetProperty("username", out var value) && !string.IsNullOrWhiteSpace(value.GetString());
+    }
 
     private async Task Refresh()
     {
@@ -57,7 +65,10 @@ public partial class MainWindow : Window
             NetworkHint.Text = tail != null ? "Tailscale address detected. Use the same Tailscale account on your Mac; check that its connection is direct for best performance."
                 : "This is a local address. To connect while away, install Tailscale on both devices and use this PC’s Tailscale address.";
             var running = Process.GetProcessesByName("sunshine").Length > 0;
-            HostStatus.Text = running ? "Host is running · ready for authorized devices" : "Host is stopped · start it to connect";
+            var configured = HasAdminLogin();
+            HostStatus.Text = !running ? "Host is stopped · start it to connect" : !configured ? "Host is running · create your admin login below" : "Host is running · ready for authorized devices";
+            LoginButton.Content = configured ? "Unlock" : "Create login";
+            LoginHint.Text = configured ? "Use your host admin login to approve a device. Your password stays in memory only." : "Choose an admin username and a password of at least 12 characters. You will use this login to approve your Mac’s pairing code.";
             StartButton.IsEnabled = !running;
             Displays.Text = string.Join("\n", System.Windows.Forms.Screen.AllScreens.Select((s,i) => $"Display {i+1} · {s.Bounds.Width} × {s.Bounds.Height}{(s.Primary ? " · primary" : "")}"));
             if (api != null) {
@@ -105,8 +116,9 @@ public partial class MainWindow : Window
         SunshineApi? candidate = null;
         try {
             if (!File.Exists(Certificate)) throw new InvalidOperationException("Start the host first so it can create its local certificate.");
-            if (string.IsNullOrWhiteSpace(Username.Text) || Password.Password.Length == 0) throw new InvalidOperationException("Enter the admin login you created in Sunshine settings.");
+            if (string.IsNullOrWhiteSpace(Username.Text) || Username.Text.Contains(':') || Password.Password.Length == 0) throw new InvalidOperationException("Enter your host admin username (without a colon) and password.");
             candidate = new SunshineApi(Username.Text.Trim(), Password.Password, Certificate);
+            if (!HasAdminLogin()) await candidate.CreateInitialLogin(Username.Text.Trim(), Password.Password);
             await candidate.VerifyLogin();
             api?.Dispose(); api = candidate; candidate = null;
             Password.Clear();

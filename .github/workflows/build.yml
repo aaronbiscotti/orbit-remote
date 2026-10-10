@@ -50,7 +50,6 @@ jobs:
         with:
           version: '6.11.2'
           cache: true
-          modules: 'qtsvg'
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'

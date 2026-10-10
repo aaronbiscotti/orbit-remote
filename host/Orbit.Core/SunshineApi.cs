@@ -54,6 +54,14 @@ public sealed class SunshineApi : IDisposable
 
     public async Task VerifyLogin() => _ = await Read("api/config");
 
+    public Task CreateInitialLogin(string username, string password)
+    {
+        if (string.IsNullOrWhiteSpace(username) || username.Contains(':') || password.Length < 12)
+            throw new ArgumentException("Choose a username without a colon and a password of at least 12 characters.");
+        return Post("api/password", new { currentUsername = "", currentPassword = "", newUsername = username,
+            newPassword = password, confirmNewPassword = password });
+    }
+
     public async Task<IReadOnlyList<PairRequest>> PendingPairs()
     {
         var root = await Read("api/pin");

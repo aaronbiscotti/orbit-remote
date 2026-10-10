@@ -9,6 +9,13 @@ async Task Reject(Func<Task> action) { try { await action(); } catch (Exception)
 var fake = new FakeHandler();
 using var api = new SunshineApi(fake, "owner", "private password");
 fake.Body = "{\"status\":true}";
+await api.CreateInitialLogin("owner", "private password");
+Check(fake.LastUri!.EndsWith("api/password"), "Initial login uses wrong endpoint.");
+using(var initial = JsonDocument.Parse(fake.PostBody!)) {
+    Check(initial.RootElement.GetProperty("currentPassword").GetString() == "", "Must not claim existing credentials during initial setup.");
+    Check(initial.RootElement.GetProperty("newPassword").GetString() == initial.RootElement.GetProperty("confirmNewPassword").GetString(), "Password confirmation mismatch.");
+}
+await Reject(() => api.CreateInitialLogin("owner", "short"));
 await api.VerifyLogin();
 Check(fake.LastUri == "https://127.0.0.1:47990/api/config", "Admin requests must remain on loopback.");
 Check(fake.Authorization == "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("owner:private password")), "Missing authentication.");

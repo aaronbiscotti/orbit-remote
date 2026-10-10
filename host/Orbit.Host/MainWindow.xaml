@@ -1,5 +1,5 @@
 <Window x:Class="Orbit.Host.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Orbit Host" Width="860" Height="880" MinWidth="720" MinHeight="650" Background="#101218" WindowStartupLocation="CenterScreen" Foreground="#EEF1FA">
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
+  <ScrollViewer x:Name="ContentScroll" VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="32,24,32,28">
       <Grid Margin="0,0,0,24">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -28,11 +28,11 @@
       <Border Background="#1B1F2A" CornerRadius="26" Padding="24" Margin="0,0,0,16">
         <StackPanel>
           <TextBlock Text="Authorize your Mac" FontSize="20" FontWeight="SemiBold"/>
-          <TextBlock Text="First, create your host admin login in Sunshine settings. Enter it here to approve a device. Your password stays in memory only." Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,16"/>
+          <TextBlock x:Name="LoginHint" Text="Create your admin login here on first launch. Your password stays in memory only; Sunshine stores its password hash locally." Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,16"/>
           <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel Margin="0,0,12,0"><TextBlock Text="Admin username" FontSize="11" Margin="0,0,0,6"/><TextBox x:Name="Username"/></StackPanel>
             <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Admin password" FontSize="11" Margin="0,0,0,6"/><PasswordBox x:Name="Password"/></StackPanel>
-            <Button x:Name="LoginButton" Grid.Column="2" Content="Unlock" VerticalAlignment="Bottom" Click="Unlock"/>
+            <Button x:Name="LoginButton" Grid.Column="2" Content="Create login" VerticalAlignment="Bottom" Click="Unlock"/>
           </Grid>
           <Grid Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="125"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel Margin="0,0,12,0"><TextBlock Text="Pending device" FontSize="11" Margin="0,0,0,6"/><ComboBox x:Name="Pending" Height="40" DisplayMemberPath="Name" IsEnabled="False"/></StackPanel>
