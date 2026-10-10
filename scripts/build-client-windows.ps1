@@ -3,7 +3,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $engineRoot = Join-Path $repoRoot 'vendor\moonlight'
 $buildRoot = Join-Path $repoRoot 'tools\client-build'
 $deployRoot = Join-Path $repoRoot 'dist\Orbit-Client-Windows'
+$jomRoot = Join-Path $repoRoot 'tools\jom'
 New-Item -ItemType Directory -Force -Path $buildRoot,$deployRoot | Out-Null
+if (!(Test-Path -LiteralPath (Join-Path $jomRoot 'jom.exe'))) {
+    New-Item -ItemType Directory -Force -Path $jomRoot | Out-Null
+    $jomZip = Join-Path $jomRoot 'jom.zip'
+    Invoke-WebRequest 'https://download.qt.io/official_releases/jom/jom_1_1_7.zip' -OutFile $jomZip
+    if ((Get-FileHash -LiteralPath $jomZip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4c8af345586a9a08fbfd2f613fcac748226d91a75627aa3581b297dd513046fe') {
+        throw 'Qt jom checksum verification failed.'
+    }
+    Expand-Archive -LiteralPath $jomZip -DestinationPath $jomRoot
+}
 Push-Location $engineRoot
 try {
     & powershell -NoProfile -File setup-deps.ps1
@@ -13,7 +23,7 @@ Push-Location $buildRoot
 try {
     & qmake (Join-Path $engineRoot 'moonlight-qt.pro') 'CONFIG+=release'
     if ($LASTEXITCODE -ne 0) { throw 'qmake failed.' }
-    & nmake release
+    & (Join-Path $jomRoot 'jom.exe') -j 4 release
     if ($LASTEXITCODE -ne 0) { throw 'Compilation failed.' }
     $clientExe = Join-Path $buildRoot 'app\release\Moonlight.exe'
     Copy-Item $clientExe $deployRoot

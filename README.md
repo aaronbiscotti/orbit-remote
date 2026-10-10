@@ -18,7 +18,7 @@ Install [Tailscale](https://tailscale.com/download) on the PC and Mac, sign in t
 
 The PC must stay powered, logged into an interactive desktop, and awake. Orbit Host includes an optional keep-awake checkbox, released when its window closes. This initial portable host is not a Windows service; it does not provide reliable access to the login screen after reboot or UAC secure desktop. Autorun, wake-on-LAN and service installation are future work. Sunshine continues running after closing the companion; `scripts/stop-host.ps1` stops this project's instance.
 
-Windows Firewall may need inbound rules. Run `scripts/enable-firewall.ps1` in an administrator PowerShell if connection attempts are blocked. It scopes streaming ports to your local subnet and Tailscale address range and leaves the admin port unopened. No firewall settings are changed by the normal launcher.
+Click **Enable connections** in Orbit Host and approve Windows' administrator prompt to add the inbound firewall rules. You can also run `scripts/enable-firewall.ps1` in an administrator PowerShell. It scopes streaming ports to your local subnet and Tailscale address range and leaves the admin port unopened. No firewall settings are changed by the normal launcher. Run the companion from the project folder so it can find its runtime and setup scripts.
 
 ## Displays and limitations
 

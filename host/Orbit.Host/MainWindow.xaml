@@ -20,6 +20,7 @@
           <WrapPanel>
             <Button x:Name="StartButton" Content="Start host" Background="#B7C5FF" Foreground="#151927" Click="StartHost" Margin="0,0,10,8"/>
             <Button Content="Sunshine settings" Click="OpenSettings" Margin="0,0,10,8"/>
+            <Button Content="Enable connections" Click="EnableConnections" Margin="0,0,10,8"/>
             <Button Content="Tailscale setup" Click="OpenTailscale" Margin="0,0,0,8"/>
           </WrapPanel>
           <CheckBox x:Name="KeepAwake" Content="Keep this PC awake while Orbit Host is open" Margin="0,8,0,0" Checked="AwakeChanged" Unchecked="AwakeChanged"/>

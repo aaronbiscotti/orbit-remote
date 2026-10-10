@@ -57,6 +57,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/build-client-windows.ps1
+      - name: Verify Windows client startup
+        if: runner.os == 'Windows'
+        run: python scripts/smoke-client.py dist/Orbit-Client-Windows/Orbit.exe
       - name: Build universal Mac client
         if: runner.os == 'macOS'
         shell: bash

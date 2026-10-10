@@ -18,7 +18,7 @@ public sealed class SunshineApi : IDisposable
     private readonly HttpClient client;
     public SunshineApi(string username, string password, string certificatePath)
     {
-        using var trusted = X509Certificate2.CreateFromPemFile(certificatePath);
+        using var trusted = X509Certificate2.CreateFromPem(File.ReadAllText(certificatePath));
         var expected = SHA256.HashData(trusted.RawData);
         var handler = new HttpClientHandler {
             AllowAutoRedirect = false,

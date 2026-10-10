@@ -23,6 +23,9 @@ with open(path, 'wb') as file:
 PY
 # A local development signature; notarization requires the owner's Apple account.
 codesign --force --deep --sign - "$BUILD/app/Orbit.app"
+codesign --verify --deep --strict --verbose=2 "$BUILD/app/Orbit.app"
+lipo -archs "$BUILD/app/Orbit.app/Contents/MacOS/Moonlight"
+python3 "$ROOT/scripts/smoke-client.py" "$BUILD/app/Orbit.app/Contents/MacOS/Moonlight"
 ditto -c -k --sequesterRsrc --keepParent "$BUILD/app/Orbit.app" "$DEPLOY/Orbit-macOS.zip"
 cp "$ROOT/NOTICE" "$DEPLOY/NOTICE.txt"
 cp "$ENGINE/LICENSE" "$DEPLOY/Moonlight-LICENSE.txt"

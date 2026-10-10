@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using System.Text.Json;
+using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -56,11 +57,13 @@ public partial class MainWindow : Window
         if (refreshing || pairing) return;
         refreshing = true;
         try {
-            var addresses = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(n => n.OperationalStatus == OperationalStatus.Up)
+            var adapters = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up).ToArray();
+            var addresses = adapters.OrderByDescending(n => n.GetIPProperties().GatewayAddresses.Count > 0)
                 .SelectMany(n => n.GetIPProperties().UnicastAddresses)
                 .Select(n => n.Address).Where(n => n.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(n)).ToArray();
-            var tail = addresses.FirstOrDefault(a => a.GetAddressBytes()[0] == 100 && (a.GetAddressBytes()[1] & 0xC0) == 0x40);
+            var tail = adapters.Where(n => (n.Name + " " + n.Description).Contains("tailscale", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(n => n.Address)
+                .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && a.GetAddressBytes()[0] == 100 && (a.GetAddressBytes()[1] & 0xC0) == 0x40);
             Address.Text = (tail ?? addresses.FirstOrDefault())?.ToString() ?? "No network address";
             NetworkHint.Text = tail != null ? "Tailscale address detected. Use the same Tailscale account on your Mac; check that its connection is direct for best performance."
                 : "This is a local address. To connect while away, install Tailscale on both devices and use this PC’s Tailscale address.";
@@ -107,6 +110,18 @@ public partial class MainWindow : Window
     }
     private void OpenSettings(object sender, RoutedEventArgs e) => Open("https://127.0.0.1:47990");
     private void OpenTailscale(object sender, RoutedEventArgs e) => Open("https://tailscale.com/download");
+    private void EnableConnections(object sender, RoutedEventArgs e)
+    {
+        var script = Path.Combine(root, "scripts", "enable-firewall.ps1");
+        if (!File.Exists(script)) { StatusLine.Text = "Open Orbit Host from the project folder to enable connections."; return; }
+        try {
+            var command = "& '" + script.Replace("'", "''") + "'";
+            var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+            Process.Start(new ProcessStartInfo("powershell.exe") { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden,
+                Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded });
+            StatusLine.Text = "Approve the Windows administrator prompt to allow streaming from LAN and Tailscale devices.";
+        } catch (System.ComponentModel.Win32Exception) { StatusLine.Text = "Administrator approval was cancelled. You can enable connections later."; }
+    }
     private static void Open(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     private void CopyAddress(object sender, RoutedEventArgs e) { Clipboard.SetText(Address.Text); StatusLine.Text = "PC address copied."; }
 

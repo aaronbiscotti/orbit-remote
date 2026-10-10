@@ -2,6 +2,8 @@ using Orbit.Core;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 var assertions = 0;
 void Check(bool result, string message) { assertions++; if (!result) throw new Exception(message); }
@@ -44,6 +46,26 @@ fake.Body = "{\"status\":true}";
 await api.Revoke("device-id");
 Check(fake.LastUri!.EndsWith("api/clients/unpair") && fake.PostBody!.Contains("device-id"), "Wrong revocation request.");
 Console.WriteLine($"PASS: {assertions} authentication, pairing, and revocation assertions.");
+
+if (args.Length == 2 && args[0] == "--probe-host") {
+    using var live = new SunshineApi("orbit-invalid-test-user", "deliberately-invalid", args[1]);
+    try { await live.VerifyLogin(); throw new Exception("Invalid credentials were accepted."); }
+    catch (HttpRequestException error) when (error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Found or HttpStatusCode.TemporaryRedirect) {
+        Console.WriteLine("PASS: pinned TLS connects and live host denies an unauthenticated admin request.");
+    }
+    using var key = RSA.Create(2048);
+    var certificateRequest = new CertificateRequest("CN=WrongHost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    using var wrongCertificate = certificateRequest.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddMinutes(10));
+    var tempPath = Path.Combine(Path.GetTempPath(), "orbit-cert-test-" + Guid.NewGuid().ToString("N") + ".pem");
+    try {
+        File.WriteAllText(tempPath, wrongCertificate.ExportCertificatePem());
+        using var wrongHost = new SunshineApi("orbit-invalid-test-user", "deliberately-invalid", tempPath);
+        try { await wrongHost.VerifyLogin(); throw new Exception("Wrong host certificate was accepted."); }
+        catch (HttpRequestException error) when (error.InnerException is System.Security.Authentication.AuthenticationException) {
+            Console.WriteLine("PASS: live TLS pinning rejects a mismatched host certificate.");
+        }
+    } finally { File.Delete(tempPath); }
+}
 
 sealed class FakeHandler : HttpMessageHandler
 {
