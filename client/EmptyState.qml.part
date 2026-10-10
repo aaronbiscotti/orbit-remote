@@ -1,36 +1,33 @@
     ColumnLayout {
         anchors.centerIn: parent
-        width: Math.min(parent.width - 64, 440)
-        spacing: 18
+        width: Math.min(parent.width - 64, 480)
+        spacing: 20
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
             width: 88; height: 88; radius: 32; color: "#222B43"
-            Image {
-                anchors.centerIn: parent
-                source: "qrc:/res/desktop_windows-48px.svg"
-                sourceSize.width: 44; sourceSize.height: 44
-            }
+            Image { anchors.centerIn: parent; source: "qrc:/res/desktop_windows-48px.svg"; sourceSize.width: 44; sourceSize.height: 44 }
         }
         Label {
-            text: qsTr("Bring your desktop with you")
-            font.pointSize: 24; font.weight: Font.DemiBold
-            Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
+            text: qsTr("Connect your PC")
+            font.pointSize: 26; font.weight: Font.DemiBold
+            Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter
         }
         Label {
-            text: qsTr("Add your PC’s address, pair once, and connect to your actual desktop. For access away from home, use its Tailscale address.")
+            text: qsTr("Open Orbit Host on your PC. Copy its address.")
             color: "#A5ADC1"; font.pointSize: 12
             Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
         }
         Button {
-            text: qsTr("Add your PC")
+            text: qsTr("Add PC →")
             Layout.alignment: Qt.AlignHCenter
             onClicked: addPcDialog.open()
             background: Rectangle { radius: 22; color: parent.hovered ? "#CAD4FF" : "#B7C5FF" }
             contentItem: Text { text: parent.text; color: "#151927"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-            leftPadding: 28; rightPadding: 28; topPadding: 14; bottomPadding: 14
+            leftPadding: 32; rightPadding: 32; topPadding: 16; bottomPadding: 16
         }
+        Label { text: qsTr("Add PC   →   Pair   →   Desktop"); color: "#929CB4"; font.pointSize: 11; Layout.alignment: Qt.AlignHCenter }
         Label {
-            text: StreamingPreferences.enableMdns ? qsTr("Looking for PCs on your network…") : qsTr("Automatic discovery is disabled")
+            text: qsTr("Away from home? Connect Tailscale on both devices.")
             color: "#68758F"; font.pointSize: 10; Layout.alignment: Qt.AlignHCenter
         }
         visible: pcGrid.count === 0

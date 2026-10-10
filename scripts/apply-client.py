@@ -25,8 +25,8 @@ def overlays():
     start = main.index("    header: ToolBar {")
     end = main.index("    ErrorMessageDialog {", start)
     main = main[:start] + (ROOT / "client" / "Header.qml.part").read_text(encoding="utf-8") + "\n\n" + main[end:]
-    main = replace(main, 'property string label: qsTr("Enter the IP address of your host PC:")', 'title: qsTr("Add your PC")\n        property string label: qsTr("PC address (local or Tailscale)")')
-    main = replace(main, "id: editText\n                Layout.fillWidth", "id: editText\n                placeholderText: qsTr(\"100.x.x.x or your PC name\")\n                Layout.preferredWidth: 340\n                Layout.fillWidth")
+    start = main.index("    NavigableDialog {\n        id: addPcDialog")
+    main = main[:start] + (ROOT / "client" / "AddPcDialog.qml.part").read_text(encoding="utf-8-sig") + "\n}\n"
 
     pc = original("app/gui/PcView.qml")
     pc = replace(pc, "cellWidth: 310; cellHeight: 330;", "cellWidth: 332; cellHeight: 284;")
@@ -40,7 +40,11 @@ def overlays():
     pc = replace(pc, "anchors.verticalCenterOffset: !model.online ? -18 : -16", "anchors.verticalCenterOffset: -6")
     pc = replace(pc, "width: parent.width\n            anchors.top: pcIcon.bottom\n            anchors.bottom: parent.bottom\n            font.pointSize: 36", "width: parent.width - 40\n            anchors.horizontalCenter: parent.horizontalCenter\n            anchors.top: pcIcon.bottom\n            anchors.topMargin: 18\n            height: 40\n            font.pointSize: 21")
     pc = replace(pc, "        Loader {\n            id: pcContextMenuLoader", "        Label {\n            anchors.horizontalCenter: parent.horizontalCenter\n            anchors.bottom: parent.bottom\n            anchors.bottomMargin: 30\n            text: model.statusUnknown ? qsTr(\"Checking connection…\") : !model.online ? qsTr(\"Offline\") : model.paired ? qsTr(\"Ready to connect\") : qsTr(\"Pair this computer\")\n            color: model.online ? \"#BAC8FF\" : \"#9299AA\"\n            font.pointSize: 11\n        }\n\n        Loader {\n            id: pcContextMenuLoader")
-    pc = replace(pc, 'text:qsTr("Please enter %1 on your host PC. This dialog will close when pairing is completed.").arg(pin)+"\\n\\n"+\n             qsTr("If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.")', 'title: qsTr("Pair your Mac")\n        imageSrc: "qrc:/res/baseline-lock-24px.svg"\n        text: qsTr("Your pairing code: %1").arg(pin) + "\\n\\n" +\n              qsTr("Enter this code in Orbit Host on your PC, or in Sunshine settings. Pairing saves a device credential for future connections.")')
+    pc = replace(pc, 'model.paired ? qsTr("Ready to connect") : qsTr("Pair this computer")', 'model.paired ? qsTr("Connect →") : qsTr("Pair →")')
+    pc = replace(pc, 'color: model.online ? "#BAC8FF" : "#9299AA"\n            font.pointSize: 11', 'color: model.online ? "#151927" : "#9299AA"\n            font.pointSize: 11\n            padding: 10\n            background: Rectangle { radius: 16; color: model.online ? "#B7C5FF" : "#252B38" }')
+    start = pc.index("    NavigableMessageDialog {\n        id: pairDialog")
+    end = pc.index("    NavigableMessageDialog {\n        id: deletePcDialog", start)
+    pc = pc[:start] + (ROOT / "client" / "PairDialog.qml.part").read_text(encoding="utf-8-sig") + "\n" + pc[end:]
 
     dialog = original("app/gui/NavigableDialog.qml")
     dialog = replace(dialog, "modal: true", 'modal: true\n    padding: 26\n    background: Rectangle {\n        radius: 26\n        color: "#202532"\n        border.color: "#343C4E"\n        border.width: 1\n    }')

@@ -45,7 +45,10 @@ Check((await api.Clients()).Single().Id == "device-id", "Client list incompatibl
 fake.Body = "{\"status\":true}";
 await api.Revoke("device-id");
 Check(fake.LastUri!.EndsWith("api/clients/unpair") && fake.PostBody!.Contains("device-id"), "Wrong revocation request.");
-Console.WriteLine($"PASS: {assertions} authentication, pairing, and revocation assertions.");
+Check(SetupProgress.CurrentStep(false, false) == 0 && SetupProgress.CurrentStep(false, true) == 0, "Firewall permission must not bypass PC login.");
+Check(SetupProgress.CurrentStep(true, false) == 1, "Connection step must wait for verified firewall permission.");
+Check(SetupProgress.CurrentStep(true, true) == 2, "An unlocked, permitted host should advance to Mac pairing.");
+Console.WriteLine($"PASS: {assertions} setup, authentication, pairing, and revocation assertions.");
 
 if (args.Length == 2 && args[0] == "--probe-host") {
     using var live = new SunshineApi("orbit-invalid-test-user", "deliberately-invalid", args[1]);

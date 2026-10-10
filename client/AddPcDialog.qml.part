@@ -1,0 +1,26 @@
+    NavigableDialog {
+        id: addPcDialog
+        title: qsTr("Add PC")
+        standardButtons: Dialog.NoButton
+        onOpened: editText.forceActiveFocus()
+        onClosed: editText.clear()
+        onAccepted: { if (editText.text.trim()) ComputerManager.addNewHostManually(editText.text.trim()) }
+        ColumnLayout {
+            spacing: 16
+            Label { text: qsTr("Copy the address from Orbit Host on your PC."); color: "#A5ADC1"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            TextField {
+                id: editText
+                placeholderText: qsTr("PC address, e.g. 100.x.x.x")
+                Layout.preferredWidth: 360; Layout.fillWidth: true
+                focus: true
+                Keys.onReturnPressed: { if (text.trim()) addPcDialog.accept() }
+                Keys.onEnterPressed: { if (text.trim()) addPcDialog.accept() }
+            }
+        }
+        footer: DialogButtonBox {
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { text: qsTr("Add PC →"); enabled: editText.text.trim().length > 0; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            onAccepted: addPcDialog.accept()
+            onRejected: addPcDialog.reject()
+        }
+    }
