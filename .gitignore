@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+dist/
+runtime/
+tools/
+*.user
+*.log
+.DS_Store
+__pycache__/
+*.pfx
+*.pem
+*.conf
+*.dat
+*.ini
+!vendor/

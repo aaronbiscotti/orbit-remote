@@ -1,0 +1,69 @@
+name: Build Orbit
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orbit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  host:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test host integration
+        run: dotnet run --project tests/Orbit.Tests -c Release
+      - name: Build Windows host
+        run: dotnet publish host/Orbit.Host -c Release -r win-x64 --self-contained true -o dist/Orbit-Host
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbit-Host-Windows
+          path: dist/Orbit-Host
+          if-no-files-found: error
+  client:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            platform: Windows
+          - os: macos-26
+            platform: macOS
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply native interface
+        run: python scripts/apply-client.py
+      - name: Verify reproducible overlay
+        run: python scripts/apply-client.py --check
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.2'
+          cache: true
+          modules: 'qtsvg'
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Build Windows client
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build-client-windows.ps1
+      - name: Build universal Mac client
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/build-client-mac.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbit-Client-${{ matrix.platform }}
+          path: dist/Orbit-Client-${{ matrix.platform }}
+          if-no-files-found: error

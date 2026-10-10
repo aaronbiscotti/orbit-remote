@@ -1,0 +1,55 @@
+    header: ToolBar {
+        id: toolBar
+        height: 100
+        background: Rectangle { color: "#101218" }
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 26
+            spacing: 14
+            Button {
+                visible: stackView.depth > 1
+                text: qsTr("Back")
+                onClicked: goBack()
+                background: Rectangle { radius: 18; color: parent.hovered ? "#30374A" : "#212633" }
+            }
+            Rectangle {
+                width: 44; height: 44; radius: 22; color: "#B7C5FF"
+                Text { anchors.centerIn: parent; text: "◌"; color: "#151927"; font.pixelSize: 36 }
+            }
+            ColumnLayout {
+                spacing: 1
+                Label { text: "Orbit"; font.pointSize: 21; font.weight: Font.DemiBold }
+                Label {
+                    text: stackView.depth > 1 && stackView.currentItem ? stackView.currentItem.objectName : qsTr("Your PC, wherever you are")
+                    font.pointSize: 10; color: "#979FB4"
+                }
+            }
+            Item { Layout.fillWidth: true }
+            Button {
+                text: qsTr("Add PC")
+                onClicked: addPcDialog.open()
+                background: Rectangle { radius: 18; color: parent.hovered ? "#35405B" : "#283149" }
+                Shortcut { sequence: "Ctrl+N"; onActivated: addPcDialog.open() }
+            }
+            Button {
+                id: settingsButton
+                text: qsTr("Settings")
+                onClicked: navigateTo("qrc:/gui/SettingsView.qml", SettingsView)
+                background: Rectangle { radius: 18; color: parent.hovered ? "#30374A" : "#212633" }
+                Shortcut { sequence: StandardKey.Preferences; onActivated: settingsButton.clicked() }
+            }
+        }
+    }
+    footer: Rectangle {
+        height: 54
+        color: "#101218"
+        RowLayout {
+            anchors.fill: parent; anchors.leftMargin: 28; anchors.rightMargin: 28
+            Label {
+                text: qsTr("Requested: %1 × %2 · %3 fps").arg(StreamingPreferences.width).arg(StreamingPreferences.height).arg(StreamingPreferences.fps)
+                color: "#929CB4"; font.pointSize: 10
+            }
+            Item { Layout.fillWidth: true }
+            Label { text: qsTr("Powered by Moonlight"); color: "#697389"; font.pointSize: 10 }
+        }
+    }

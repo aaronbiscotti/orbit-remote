@@ -1,0 +1,14 @@
+Orbit Remote is a personal native remote desktop project.
+
+The native streaming client derives from Moonlight Qt at
+https://github.com/moonlight-stream/moonlight-qt
+revision a57e947d7185fd01384f6973df4df59ae2968d01.
+Moonlight Qt and Orbit client modifications are licensed under GPL-3.0.
+The upstream LICENSE and copyright notices remain in vendor/moonlight.
+Orbit client modifications are available in client/ and scripts/apply-client.py.
+
+Sunshine is a separately installed GPL-3.0 streaming host from
+https://github.com/LizardByte/Sunshine. Its license remains in the downloaded
+runtime. Orbit does not claim authorship of either upstream engine.
+
+The Orbit Windows host companion and project build scripts are also GPL-3.0.
