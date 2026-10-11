@@ -48,7 +48,21 @@ Check(fake.LastUri!.EndsWith("api/clients/unpair") && fake.PostBody!.Contains("d
 Check(SetupProgress.CurrentStep(false, false) == 0 && SetupProgress.CurrentStep(false, true) == 0, "Firewall permission must not bypass PC login.");
 Check(SetupProgress.CurrentStep(true, false) == 1, "Connection step must wait for verified firewall permission.");
 Check(SetupProgress.CurrentStep(true, true) == 2, "An unlocked, permitted host should advance to Mac pairing.");
-Console.WriteLine($"PASS: {assertions} setup, authentication, pairing, and revocation assertions.");
+if (OperatingSystem.IsWindows()) {
+    var currentImage = Environment.ProcessPath!;
+    var processes = WindowsHostProcess.Find(currentImage);
+    Check(processes.Any(p => p.Id == Environment.ProcessId && p.Elevated != null), "Limited-access process queries must identify the current process and its elevation.");
+    var wrongLocation = Path.Combine(Path.GetTempPath(), "orbit-process-scope-test", Path.GetFileName(currentImage));
+    Check(WindowsHostProcess.Find(wrongLocation).Count == 0, "Matching an executable name must not select a process from another location.");
+    var scriptPath = Path.Combine(Path.GetTempPath(), "Orbit's control $(whoami)", "start-host-admin.ps1");
+    var launch = AdministratorLaunch.ForScript(scriptPath);
+    Check(launch.UseShellExecute && launch.Verb == "runas", "Administrator control must go through Windows consent.");
+    Check(Path.IsPathFullyQualified(launch.FileName) && launch.FileName.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.System), StringComparison.OrdinalIgnoreCase), "Elevated helpers must use the system PowerShell executable.");
+    var encoded = launch.Arguments.Split(' ').Last();
+    var command = Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+    Check(command.Contains("Orbit''s control $(whoami)") && command.StartsWith("& '") && command.EndsWith("'"), "Script paths must remain a single literal, including apostrophes and PowerShell expressions.");
+}
+Console.WriteLine($"PASS: {assertions} setup, authentication, pairing, revocation, and host permission assertions.");
 
 if (args.Length == 2 && args[0] == "--probe-host") {
     using var live = new SunshineApi("orbit-invalid-test-user", "deliberately-invalid", args[1]);

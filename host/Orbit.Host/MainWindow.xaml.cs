@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private SunshineApi? api;
     private bool refreshing, pairing, loggingIn, checkingAccess, enablingAccess;
     private bool accessAllowed, configured, paired, connectingAnother;
+    private bool hostRunning, administratorControl, enablingAdministrator;
     private int pendingCount;
     public MainWindow()
     {
@@ -38,7 +39,12 @@ public partial class MainWindow : Window
         } catch (Exception ex) { Notify(Friendly(ex)); }
         timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         timer.Tick += async (_, _) => await Refresh();
-        Loaded += async (_, _) => { await Refresh(); timer.Start(); await CheckFirewall(); };
+        Loaded += async (_, _) => {
+            await Refresh();
+            // Elevation is always an explicit local action; loading the app never opens UAC.
+            if (!hostRunning && !File.Exists(AdministratorPreference)) await StartStandardHost();
+            timer.Start(); await CheckFirewall();
+        };
         Closed += (_, _) => { timer.Stop(); api?.Dispose(); SetThreadExecutionState(0x80000000); };
     }
     private static string FindRoot()
@@ -53,6 +59,7 @@ public partial class MainWindow : Window
     private string Runtime => Path.Combine(root, "runtime", "sunshine", "Sunshine");
     private string Certificate => Path.Combine(Runtime, "config", "credentials", "cacert.pem");
     private string StateFile => Path.Combine(Runtime, "config", "sunshine_state.json");
+    private string AdministratorPreference => Path.Combine(Runtime, "config", "administrator-control.enabled");
     private bool HasAdminLogin()
     {
         if (!File.Exists(StateFile)) return false;
@@ -91,6 +98,13 @@ public partial class MainWindow : Window
         EnableButton.IsEnabled = !checkingAccess && !enablingAccess;
         EnableButton.Content = enablingAccess ? "Waiting for Windows…" : "Allow connections →";
         PermissionHint.Text = checkingAccess ? "Checking connection permission…" : enablingAccess ? "Approve the Windows prompt to continue." : "One click to allow connections from your Mac.";
+        AdministratorButton.Visibility = administratorControl ? Visibility.Collapsed : Visibility.Visible;
+        AdministratorButton.IsEnabled = !enablingAdministrator;
+        AdministratorButton.Content = enablingAdministrator ? "Waiting for Windows…" : "Enable administrator control";
+        AdministratorTitle.Text = administratorControl ? "✓ Administrator control enabled" : "Desktop control";
+        AdministratorHint.Text = administratorControl ? "Includes apps running as administrator." : enablingAdministrator
+            ? "Approve the prompt on this Windows PC, then reconnect."
+            : "To control Task Manager, enable this while at the PC.";
     }
     private void UpdateCredentialsButton()
     {
@@ -102,7 +116,7 @@ public partial class MainWindow : Window
     private void PinInput(object sender, TextCompositionEventArgs e) => e.Handled = e.Text.Any(c => c is < '0' or > '9');
     private async Task Refresh()
     {
-        if (refreshing || pairing || loggingIn) return;
+        if (refreshing || pairing || loggingIn || enablingAdministrator) return;
         refreshing = true;
         try {
             var adapters = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up).ToArray();
@@ -115,10 +129,12 @@ public partial class MainWindow : Window
             CopyButton.IsEnabled = tail != null || addresses.Length > 0;
             NetworkHint.Text = tail != null ? "● Tailscale connected · " + tail : "Local network · " + Address.Text;
             WaitingHint.Text = tail != null ? "Waiting for your Mac…" : "For access while away, connect Tailscale on both devices.";
-            var running = Process.GetProcessesByName("sunshine").Any(p => { try { return string.Equals(p.MainModule?.FileName, Path.Combine(Runtime, "sunshine.exe"), StringComparison.OrdinalIgnoreCase); } finally { p.Dispose(); } });
+            var processes = WindowsHostProcess.Find(Path.Combine(Runtime, "sunshine.exe"));
+            hostRunning = processes.Count > 0;
+            administratorControl = processes.Count == 1 && processes[0].Elevated == true;
             configured = HasAdminLogin();
-            HostStatus.Text = running ? "● PC sharing is on" : "○ PC sharing is off";
-            StartButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+            HostStatus.Text = hostRunning ? "● PC sharing is on" : "○ PC sharing is off";
+            StartButton.Visibility = hostRunning ? Visibility.Collapsed : Visibility.Visible;
             Displays.Text = string.Join("\n", System.Windows.Forms.Screen.AllScreens.Select((s,i) => $"Display {i+1} · {s.Bounds.Width} × {s.Bounds.Height}{(s.Primary ? " · primary" : "")}"));
             if (api != null) {
                 var pairs = await api.PendingPairs();
@@ -141,14 +157,46 @@ public partial class MainWindow : Window
     }
     private async void StartHost(object sender, RoutedEventArgs e)
     {
+        if (File.Exists(AdministratorPreference)) { await EnableAdministratorControl(); return; }
+        await StartStandardHost();
+    }
+    private async Task StartStandardHost()
+    {
         try {
             var exe = Path.Combine(Runtime, "sunshine.exe");
             var config = Path.Combine(Runtime, "config", "sunshine.conf");
             if (!File.Exists(exe) || !File.Exists(config)) { Notify("Host files are missing. Extract the full Windows download and open Launch Orbit."); return; }
             var info = new ProcessStartInfo(exe) { WorkingDirectory = Runtime, UseShellExecute = false, CreateNoWindow = true };
-            info.ArgumentList.Add(config); Process.Start(info);
+            if (WindowsHostProcess.Find(exe).Count > 0) { await Refresh(); return; }
+            info.ArgumentList.Add(config); using var process = Process.Start(info);
             Notify("Starting PC sharing…"); await Task.Delay(2500); await Refresh();
         } catch (Exception ex) { Notify(Friendly(ex)); }
+    }
+    private async void EnableAdministrator(object sender, RoutedEventArgs e) => await EnableAdministratorControl();
+    private async Task EnableAdministratorControl()
+    {
+        if (enablingAdministrator) return;
+        var script = Path.Combine(root, "scripts", "start-host-admin.ps1");
+        if (!File.Exists(script)) { Notify("Extract the complete updated Windows host first."); return; }
+        enablingAdministrator = true; Notify("PC sharing will restart after approval. Reconnect from your Mac."); DrawSteps();
+        try {
+            // Nothing is stopped until Windows has approved and started this helper.
+            using var process = Process.Start(AdministratorLaunch.ForScript(script))!;
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0) throw new InvalidOperationException("Administrator sharing could not start.");
+            var processes = WindowsHostProcess.Find(Path.Combine(Runtime, "sunshine.exe"));
+            administratorControl = processes.Count == 1 && processes[0].Elevated == true;
+            Notify(administratorControl ? "Administrator control enabled. Reconnect from your Mac." : "Administrator permission could not be verified.");
+        } catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) {
+            Notify("Approval cancelled. Your current sharing process was left running.");
+        } catch (Exception ex) {
+            // Recover ordinary desktop sharing if starting the approved replacement failed.
+            if (WindowsHostProcess.Find(Path.Combine(Runtime, "sunshine.exe")).Count == 0) {
+                await StartStandardHost();
+                Notify(Friendly(ex) + (WindowsHostProcess.Find(Path.Combine(Runtime, "sunshine.exe")).Count > 0
+                    ? " Restored sharing with standard permissions." : " Sharing is off; try Start PC sharing."));
+            } else Notify(Friendly(ex));
+        } finally { enablingAdministrator = false; await Refresh(); }
     }
     private void OpenSettings(object sender, RoutedEventArgs e) => Open("https://127.0.0.1:47990");
     private void OpenTailscale(object sender, RoutedEventArgs e) => Open("https://tailscale.com/download");

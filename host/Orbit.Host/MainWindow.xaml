@@ -67,14 +67,18 @@
         </StackPanel>
         <TextBlock x:Name="StatusLine" Foreground="#BAC8FF" FontSize="13" TextWrapping="Wrap" Margin="0,18,0,0" Visibility="Collapsed"/>
       </StackPanel></Border>
+      <Border Background="#1B1F2A" CornerRadius="22" Padding="20" Margin="0,16,0,0"><Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <StackPanel Margin="0,0,12,0"><TextBlock x:Name="AdministratorTitle" Text="Desktop control" FontSize="15"/><TextBlock x:Name="AdministratorHint" Text="To control Task Manager, enable this while at the PC." Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel>
+        <Button x:Name="AdministratorButton" Grid.Column="1" Content="Enable administrator control" Click="EnableAdministrator" VerticalAlignment="Center"/>
+      </Grid></Border>
       <CheckBox x:Name="KeepAwake" Content="Keep PC awake while Orbit is open" Margin="8,20,0,18" Checked="AwakeChanged" Unchecked="AwakeChanged"/>
       <Expander Header="More options" Foreground="{StaticResource Muted}"><StackPanel Margin="8,16,8,0">
         <WrapPanel><Button Content="Host settings ↗" Click="OpenSettings" Margin="0,0,8,10"/><Button Content="Tailscale ↗" Click="OpenTailscale" Margin="0,0,8,10"/><Button Content="Check access" Click="CheckAccess" Margin="0,0,0,10"/></WrapPanel>
         <TextBlock Text="Paired devices" FontSize="12" Margin="0,8,0,8"/>
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="Clients" DisplayMemberPath="Name" Height="40" IsEnabled="False"/><Button x:Name="RevokeButton" Grid.Column="1" Content="Remove access" IsEnabled="False" Margin="12,0,0,0" Click="Revoke"/></Grid>
         <TextBlock x:Name="Displays" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,18,0,8"/>
-        <TextBlock Text="Switch monitor: Control + Option + Shift + F1…F12" Foreground="{StaticResource Muted}" FontSize="12"/>
-        <TextBlock Text="One monitor at a time · 120 fps requested" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,8,0,0"/>
+        <TextBlock Text="Single display · frame rate selected on your Mac" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,8,0,0"/>
       </StackPanel></Expander>
     </StackPanel>
   </ScrollViewer>
