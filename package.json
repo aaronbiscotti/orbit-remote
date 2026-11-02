@@ -9,8 +9,8 @@
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke-test",
-    "dist:win": "electron-builder --win nsis zip --x64",
-    "dist:mac": "electron-builder --mac dmg zip --universal"
+    "dist:win": "electron-builder --win nsis zip --x64 --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --universal --publish never"
   },
   "build": {
     "appId": "local.orbit.remote",
