@@ -1048,11 +1048,11 @@ function registerIpcHandlers() {
 // ============================================================================
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 780,
-    minWidth: 840,
-    minHeight: 600,
-    backgroundColor: '#101218',
+    width: 720,
+    height: 580,
+    minWidth: 540,
+    minHeight: 480,
+    backgroundColor: '#09090b',
     title: 'Orbit',
     icon: path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'),
     autoHideMenuBar: true,
@@ -1068,10 +1068,16 @@ function createWindow() {
 
   if (isSmokeTest) {
     mainWindow.webContents.once('did-finish-load', () => {
-      setTimeout(() => {
+      setTimeout(async () => {
+        const snapArg = process.argv.find((a) => a.startsWith('--capture-ui='));
+        if (snapArg) {
+          const outPath = snapArg.slice('--capture-ui='.length);
+          const img = await mainWindow.webContents.capturePage();
+          fs.writeFileSync(outPath, img.toPNG());
+        }
         console.log('PASS: Orbit Electron app loaded and verified.');
         app.exit(0);
-      }, 1200);
+      }, 1400);
     });
   }
 }

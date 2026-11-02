@@ -1,7 +1,7 @@
 /* global orbit */
 (() => {
   let isWindows = false;
-  let currentMode = 'client'; // 'client' | 'host'
+  let currentMode = 'host';
   let inSession = false;
   let privacyCurtainEnabled = false;
   let remoteDesktopWidth = 1920;
@@ -9,7 +9,6 @@
   let currentFileParentPath = '';
   let currentFilePath = '';
   let pendingPairingsList = [];
-  let hostPollTimer = null;
   let toastTimeout = null;
 
   const $ = (id) => document.getElementById(id);
@@ -27,7 +26,7 @@
     if (toastTimeout) clearTimeout(toastTimeout);
     toastTimeout = setTimeout(() => {
       $('bannerBar').classList.add('hidden');
-    }, 4500);
+    }, 4000);
   }
 
   $('bannerCloseBtn').addEventListener('click', () => {
@@ -35,17 +34,15 @@
   });
 
   // ============================================================================
-  // Mode Switching (Remote Control vs Share This PC)
+  // Mode Switching (This PC vs Remote PCs)
   // ============================================================================
   function setMode(mode) {
     currentMode = mode;
-    $('modeClientBtn').classList.toggle('active', mode === 'client');
     $('modeHostBtn').classList.toggle('active', mode === 'host');
+    $('modeClientBtn').classList.toggle('active', mode === 'client');
 
-    if (!inSession) {
-      $('clientHomeView').classList.toggle('hidden', mode !== 'client');
-      $('hostView').classList.toggle('hidden', mode !== 'host');
-    }
+    $('hostView').classList.toggle('hidden', mode !== 'host');
+    $('clientHomeView').classList.toggle('hidden', mode !== 'client');
 
     if (mode === 'host' && isWindows) {
       refreshHostStatus();
@@ -54,11 +51,11 @@
     }
   }
 
-  $('modeClientBtn').addEventListener('click', () => setMode('client'));
   $('modeHostBtn').addEventListener('click', () => setMode('host'));
+  $('modeClientBtn').addEventListener('click', () => setMode('client'));
 
   // ============================================================================
-  // Share This PC (Windows Host View — Zero-Password Auto-Unlocked)
+  // This PC (Windows Host)
   // ============================================================================
   async function refreshHostStatus() {
     if (!isWindows) return;
@@ -69,69 +66,69 @@
       const ip = (st.network && st.network.primaryAddress) || '127.0.0.1';
       $('hostPrimaryIp').textContent = ip;
 
-      const badge = $('hostEngineBadge');
+      const dot = $('hostStatusDot');
+      const statusLabel = $('hostStatusLabel');
       if (st.running) {
-        badge.textContent = st.activeSessions > 0 ? `${st.activeSessions} Connected` : 'Online · Port 47995';
-        badge.className = 'sh-badge sh-badge-green';
+        dot.className = 'dot online';
+        statusLabel.textContent = st.activeSessions > 0 ? `${st.activeSessions} active session` : 'Ready to connect';
       } else {
-        badge.textContent = 'Starting...';
-        badge.className = 'sh-badge sh-badge-secondary';
+        dot.className = 'dot';
+        statusLabel.textContent = 'Starting...';
       }
 
       const isSystem = st.privilege === 'SYSTEM' || st.privilege === 'Administrator';
-      const sysReady = isSystem && st.firewallAllowed;
+      const checkIcon = $('adminStatusIcon');
+      const statusText = $('adminStatusText');
+      const enableBtn = $('enableSystemAccessBtn');
 
-      const sysBadge = $('systemAccessBadge');
-      const sysBtn = $('enableSystemAccessBtn');
-      if (sysReady || isSystem) {
-        sysBadge.textContent = `${st.privilege} · UAC Ready`;
-        sysBadge.className = 'sh-badge sh-badge-green';
-        sysBtn.textContent = 'Enabled ✓';
-        sysBtn.disabled = true;
-      } else {
-        sysBadge.textContent = 'Standard';
-        sysBadge.className = 'sh-badge sh-badge-outline';
-        sysBtn.textContent = 'Enable';
-        sysBtn.disabled = false;
-      }
-
-      const topBadge = $('privilegeBadge');
       if (isSystem) {
-        topBadge.textContent = `${st.privilege} · UAC Ready`;
-        topBadge.className = 'sh-badge sh-badge-green';
+        checkIcon.classList.remove('hidden');
+        statusText.textContent = 'Administrator & UAC access active';
+        enableBtn.classList.add('hidden');
       } else {
-        topBadge.textContent = st.running ? 'Engine Ready' : 'Starting...';
-        topBadge.className = 'sh-badge sh-badge-outline';
+        checkIcon.classList.add('hidden');
+        statusText.textContent = 'Standard user access';
+        enableBtn.classList.remove('hidden');
       }
 
       // Pending pairing requests
       pendingPairingsList = st.pendingPairs || [];
-      const waitBadge = $('pendingPairBadge');
       const hint = $('pendingPairHint');
       if (pendingPairingsList.length > 0) {
         const latest = pendingPairingsList[0];
-        waitBadge.classList.remove('hidden');
-        hint.textContent = `${latest.name || 'Device'} (${latest.address || 'remote'}) is waiting — enter its 4-digit PIN.`;
+        hint.textContent = `● ${latest.name || 'Mac'} is waiting — enter PIN below`;
+        hint.className = 'field-hint active-wait';
       } else {
-        waitBadge.classList.add('hidden');
-        hint.textContent = 'Click Pair on your Mac, then enter the 4-digit PIN here.';
+        hint.textContent = 'Enter the 4-digit PIN shown on your Mac';
+        hint.className = 'field-hint';
       }
 
       // Paired devices list
       const paired = st.pairedClients || [];
-      const pairedCard = $('pairedDevicesCard');
+      const section = $('pairedDevicesSection');
       const listEl = $('pairedClientsList');
       listEl.innerHTML = '';
       if (paired.length === 0) {
-        pairedCard.classList.add('hidden');
+        section.classList.add('hidden');
       } else {
-        pairedCard.classList.remove('hidden');
+        section.classList.remove('hidden');
         for (const item of paired) {
           const row = document.createElement('div');
           row.className = 'paired-item';
+
+          const left = document.createElement('div');
+          left.className = 'item-left';
+
+          const d = document.createElement('span');
+          d.className = 'dot online';
+
           const nameSpan = document.createElement('span');
-          nameSpan.className = 'sh-label';
+          nameSpan.className = 'item-title';
           nameSpan.textContent = item.name || 'Mac';
+
+          left.appendChild(d);
+          left.appendChild(nameSpan);
+
           const btn = document.createElement('button');
           btn.className = 'sh-btn sh-btn-ghost sh-btn-sm';
           btn.textContent = 'Remove';
@@ -139,7 +136,8 @@
             await orbit.revokeClient(item.uuid);
             refreshHostStatus();
           });
-          row.appendChild(nameSpan);
+
+          row.appendChild(left);
           row.appendChild(btn);
           listEl.appendChild(row);
         }
@@ -150,7 +148,12 @@
   $('copyPrimaryIpBtn').addEventListener('click', async () => {
     const ip = $('hostPrimaryIp').textContent;
     await orbit.copyText(ip);
-    showBanner(`Copied ${ip} to clipboard.`);
+    const btn = $('copyPrimaryIpBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => {
+      btn.textContent = prev;
+    }, 1500);
   });
 
   $('enableSystemAccessBtn').addEventListener('click', async () => {
@@ -158,12 +161,12 @@
       $('enableSystemAccessBtn').disabled = true;
       $('enableSystemAccessBtn').textContent = 'Enabling...';
       await orbit.enableSystemAccess();
-      showBanner('Administrator, UAC Secure Desktop, and Firewall enabled.');
+      showBanner('Administrator & UAC access enabled.');
       await refreshHostStatus();
     } catch (err) {
       $('enableSystemAccessBtn').disabled = false;
-      $('enableSystemAccessBtn').textContent = 'Enable';
-      showBanner(err.message || 'Could not enable system access.');
+      $('enableSystemAccessBtn').textContent = 'Enable Admin Access';
+      showBanner(err.message || 'Could not enable administrator access.');
     }
   });
 
@@ -178,7 +181,7 @@
       const target = pendingPairingsList[0] || { id: '', name: 'Mac' };
       await orbit.pairMac(target.id || '', pin, target.name || 'Mac');
       $('hostPinInput').value = '';
-      showBanner('Device paired! You can now click Connect on your Mac.');
+      showBanner('Device paired! You can now connect from your Mac.');
       await refreshHostStatus();
     } catch (err) {
       showBanner(err.message || 'Pairing failed. Check the 4-digit PIN.');
@@ -196,7 +199,7 @@
   });
 
   // ============================================================================
-  // Remote Control View (Connect to PC)
+  // Remote PCs (Client View)
   // ============================================================================
   async function refreshPcCards() {
     const res = await orbit.listPcs();
@@ -213,35 +216,26 @@
 
     for (const pc of list) {
       const card = document.createElement('div');
-      card.className = 'sh-card pc-item';
+      card.className = 'pc-item';
 
       const left = document.createElement('div');
-      left.className = 'pc-meta';
+      left.className = 'item-left';
 
       const dot = document.createElement('span');
-      dot.className = 'status-dot' + (pc.online ? ' online' : '');
+      dot.className = 'dot' + (pc.online ? ' online' : '');
 
       const textGroup = document.createElement('div');
-      const titleRow = document.createElement('div');
-      titleRow.className = 'row-gap-sm';
-
-      const nameEl = document.createElement('span');
-      nameEl.className = 'pc-title';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'item-title';
       nameEl.textContent = pc.name || pc.address;
-      titleRow.appendChild(nameEl);
-
-      if (pc.paired) {
-        const b = document.createElement('span');
-        b.className = 'sh-badge sh-badge-secondary';
-        b.textContent = 'Paired';
-        titleRow.appendChild(b);
-      }
 
       const subEl = document.createElement('div');
-      subEl.className = 'pc-sub';
-      subEl.textContent = pc.online ? `${pc.address} · Online` : `${pc.address} · Offline`;
+      subEl.className = 'item-sub';
+      subEl.textContent = pc.online
+        ? `${pc.address} · ${pc.paired ? 'Paired' : 'Ready to pair'}`
+        : `${pc.address} · Offline`;
 
-      textGroup.appendChild(titleRow);
+      textGroup.appendChild(nameEl);
       textGroup.appendChild(subEl);
 
       left.appendChild(dot);
@@ -251,7 +245,7 @@
       actions.className = 'row-gap-sm';
 
       const mainBtn = document.createElement('button');
-      mainBtn.className = pc.paired ? 'sh-btn sh-btn-primary sh-btn-sm' : 'sh-btn sh-btn-outline sh-btn-sm';
+      mainBtn.className = pc.paired ? 'sh-btn sh-btn-primary sh-btn-sm' : 'sh-btn sh-btn-secondary sh-btn-sm';
       mainBtn.textContent = pc.paired ? 'Connect' : 'Pair';
       mainBtn.disabled = !pc.online;
       mainBtn.addEventListener('click', () => {
@@ -263,7 +257,7 @@
       });
 
       const delBtn = document.createElement('button');
-      delBtn.className = 'sh-btn sh-btn-ghost sh-btn-icon-sm';
+      delBtn.className = 'sh-btn-icon';
       delBtn.title = 'Remove PC';
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', async () => {
@@ -339,15 +333,8 @@
       $('desktopLoadingOverlay').classList.remove('hidden');
 
       inSession = true;
-      $('clientHomeView').classList.add('hidden');
-      $('hostView').classList.add('hidden');
+      $('homeShell').classList.add('hidden');
       $('sessionView').classList.remove('hidden');
-
-      $('homeTabs').classList.add('hidden');
-      $('homeStatusGroup').classList.add('hidden');
-      $('sessionTabs').classList.remove('hidden');
-      $('sessionToolbar').classList.remove('hidden');
-      $('disconnectBtn').classList.remove('hidden');
 
       $('headerTitle').textContent = label;
       switchSessionTab('desktop');
@@ -374,14 +361,8 @@
     $('curtainBtn').textContent = 'Blank PC';
 
     $('sessionView').classList.add('hidden');
-    $('sessionTabs').classList.add('hidden');
-    $('sessionToolbar').classList.add('hidden');
-    $('disconnectBtn').classList.add('hidden');
     $('uacAlertBadge').classList.add('hidden');
-
-    $('homeTabs').classList.remove('hidden');
-    $('homeStatusGroup').classList.remove('hidden');
-    $('headerTitle').textContent = 'Orbit';
+    $('homeShell').classList.remove('hidden');
 
     setMode(currentMode);
   }
@@ -661,7 +642,7 @@
   // ============================================================================
   $('sasBtn').addEventListener('click', () => {
     orbit.send({ type: 'power_action', action: 'sas' });
-    showBanner('Sent Ctrl+Alt+Del (Secure Attention Sequence) to PC.');
+    showBanner('Sent Ctrl+Alt+Del to PC.');
   });
 
   $('curtainBtn').addEventListener('click', () => {
@@ -675,7 +656,7 @@
     const w = Math.max(1024, Math.round(vp.width));
     const h = Math.max(720, Math.round(vp.height));
     orbit.send({ type: 'set_resolution', width: w, height: h });
-    showBanner(`Requested PC display resolution ${w}×${h}.`);
+    showBanner(`Requested resolution ${w}×${h}.`);
   });
 
   $('sessionQualitySelect').addEventListener('change', (e) => {
@@ -769,7 +750,7 @@
         const left = document.createElement('div');
         left.className = 'row-gap-sm';
         const name = document.createElement('span');
-        name.className = 'sh-label';
+        name.className = 'item-title';
         name.textContent = item.isDir ? `📁 ${item.name}` : `📄 ${item.name}`;
         left.appendChild(name);
 
@@ -786,7 +767,7 @@
         } else {
           const kb = Math.max(1, Math.round((item.size || 0) / 1024));
           const sz = document.createElement('span');
-          sz.className = 'sh-muted';
+          sz.className = 'footer-muted';
           sz.textContent = `${kb.toLocaleString()} KB`;
           right.appendChild(sz);
 
@@ -795,7 +776,7 @@
           dlBtn.textContent = 'Download';
           dlBtn.addEventListener('click', () => {
             orbit.send({ type: 'file_download', path: item.path });
-            showBanner(`Downloading ${item.name} to Downloads...`);
+            showBanner(`Downloading ${item.name}...`);
           });
           right.appendChild(dlBtn);
         }
@@ -823,10 +804,10 @@
 
         const left = document.createElement('div');
         const title = document.createElement('div');
-        title.className = 'sh-label';
+        title.className = 'item-title';
         title.textContent = p.title ? `${p.name} — ${p.title}` : p.name;
         const sub = document.createElement('div');
-        sub.className = 'sh-muted mono';
+        sub.className = 'item-sub';
         sub.textContent = `PID ${p.pid} · ${p.memoryMb} MB`;
         left.appendChild(title);
         left.appendChild(sub);
@@ -857,10 +838,9 @@
       $('modeHostBtn').classList.add('hidden');
       setMode('client');
     } else {
-      // On Windows, default to "Share This PC" so the user immediately sees their IP & Pair box
       setMode('host');
       orbit.setKeepAwake(true);
-      hostPollTimer = setInterval(() => {
+      setInterval(() => {
         if (!inSession && currentMode === 'host') {
           refreshHostStatus();
         }

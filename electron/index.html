@@ -7,278 +7,258 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Minimalist shadcn Top Header -->
-  <header class="app-header">
-    <div class="header-left">
-      <button id="disconnectBtn" class="sh-btn sh-btn-ghost sh-btn-sm hidden" title="Disconnect">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        <span>Disconnect</span>
-      </button>
-      <div class="brand">
-        <img class="brand-logo" src="assets/icon.png" alt="Orbit" />
-        <span id="headerTitle" class="brand-name">Orbit</span>
-      </div>
-      <span id="uacAlertBadge" class="sh-badge sh-badge-amber hidden">UAC / Lock Screen</span>
+  <!-- Toast Notification -->
+  <div id="bannerBar" class="sh-toast hidden">
+    <span id="bannerText"></span>
+    <button id="bannerCloseBtn" class="sh-btn-icon" title="Dismiss">✕</button>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- HOME SHELL (Centered 540px Cohesive Layout)                           -->
+  <!-- ===================================================================== -->
+  <div id="homeShell" class="home-shell">
+    <div class="home-container">
+      <!-- Aligned Header -->
+      <header class="home-header">
+        <div class="brand">
+          <img class="brand-logo" src="assets/icon.png" alt="Orbit" />
+          <div class="brand-text">
+            <span class="brand-name">Orbit</span>
+            <span id="hostEngineStatus" class="status-inline">
+              <span id="hostStatusDot" class="dot online"></span>
+              <span id="hostStatusLabel">Ready</span>
+            </span>
+          </div>
+        </div>
+
+        <div id="homeTabs" class="sh-tabs-list">
+          <button id="modeHostBtn" class="sh-tabs-trigger active">This PC</button>
+          <button id="modeClientBtn" class="sh-tabs-trigger">Remote PCs</button>
+        </div>
+      </header>
+
+      <!-- ================================================================= -->
+      <!-- TAB 1: THIS PC (Windows Host)                                     -->
+      <!-- ================================================================= -->
+      <section id="hostView" class="stack-md">
+        <div class="sh-card">
+          <div class="card-body stack-lg">
+            <!-- Field 1: PC Address -->
+            <div class="field-group">
+              <div class="field-header">
+                <label class="field-label">This PC's Address</label>
+                <span class="field-hint">Enter this on your Mac to connect</span>
+              </div>
+              <div class="input-Copy-box">
+                <code id="hostPrimaryIp" class="ip-value">127.0.0.1</code>
+                <button id="copyPrimaryIpBtn" class="sh-btn sh-btn-secondary sh-btn-sm">Copy Address</button>
+              </div>
+            </div>
+
+            <div class="sh-divider"></div>
+
+            <!-- Field 2: Pair with 4-digit PIN -->
+            <div class="field-group">
+              <div class="field-header">
+                <label class="field-label">Pair a Device</label>
+                <span id="pendingPairHint" class="field-hint">Enter the 4-digit PIN shown on your Mac</span>
+              </div>
+              <div class="row-gap">
+                <input
+                  id="hostPinInput"
+                  type="text"
+                  maxlength="4"
+                  inputmode="numeric"
+                  class="sh-input pin-box flex-1"
+                  placeholder="Enter 4-digit PIN (e.g. 5313)"
+                />
+                <button id="hostPairBtn" class="sh-btn sh-btn-primary">Pair Device</button>
+              </div>
+            </div>
+
+            <!-- Field 3: Paired Devices (shown when devices exist) -->
+            <div id="pairedDevicesSection" class="field-group hidden">
+              <div class="sh-divider mb-4"></div>
+              <div class="field-header">
+                <label class="field-label">Paired Devices</label>
+              </div>
+              <div id="pairedClientsList" class="stack-xs"></div>
+            </div>
+          </div>
+
+          <!-- Clean Footer Bar -->
+          <div class="card-footer">
+            <div class="footer-status">
+              <span id="adminStatusIcon" class="admin-check">✓</span>
+              <span id="adminStatusText" class="footer-muted">Administrator &amp; UAC access active</span>
+              <button id="enableSystemAccessBtn" class="sh-link-btn hidden">Enable Admin Access</button>
+            </div>
+
+            <label class="switch-row" title="Prevent Windows from sleeping while Orbit is open">
+              <span class="footer-muted">Keep awake</span>
+              <span class="sh-switch">
+                <input id="keepAwakeToggle" type="checkbox" checked />
+                <span class="sh-switch-slider"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 2: REMOTE PCS (Connect as Client)                             -->
+      <!-- ================================================================= -->
+      <section id="clientHomeView" class="stack-md hidden">
+        <div class="sh-card">
+          <div class="card-body stack-md">
+            <div class="field-group">
+              <div class="field-header">
+                <label class="field-label">Connect to a PC</label>
+                <button id="refreshPcsBtn" class="sh-link-btn">Refresh status</button>
+              </div>
+              <div class="row-gap">
+                <input
+                  id="addPcAddressInput"
+                  type="text"
+                  class="sh-input flex-1"
+                  placeholder="Enter PC IP or Tailscale address (e.g. 100.108.42.59)"
+                />
+                <button id="confirmAddPcBtn" class="sh-btn sh-btn-primary">Add PC</button>
+              </div>
+            </div>
+
+            <div id="pcCardsGrid" class="stack-xs"></div>
+
+            <div id="emptyPcState" class="empty-box hidden">
+              No remote PCs saved yet. Enter an IP address above to get started.
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
+  </div>
 
-    <!-- Center Segmented Tabs (shadcn TabsList) -->
-    <div class="header-center">
-      <div id="homeTabs" class="sh-tabs-list">
-        <button id="modeClientBtn" class="sh-tabs-trigger active">Remote Control</button>
-        <button id="modeHostBtn" class="sh-tabs-trigger">Share This PC</button>
+  <!-- ===================================================================== -->
+  <!-- ACTIVE REMOTE SESSION SHELL (Full-Window Takeover Workspace)          -->
+  <!-- ===================================================================== -->
+  <div id="sessionView" class="session-shell hidden">
+    <header class="session-header">
+      <div class="row-gap-sm">
+        <button id="disconnectBtn" class="sh-btn sh-btn-ghost sh-btn-sm">
+          ← Disconnect
+        </button>
+        <span class="header-sep"></span>
+        <span id="headerTitle" class="session-title">Remote PC</span>
+        <span id="uacAlertBadge" class="uac-pill hidden">UAC / Lock Screen</span>
       </div>
 
-      <div id="sessionTabs" class="sh-tabs-list hidden">
+      <div class="sh-tabs-list">
         <button class="sh-tabs-trigger session-tab active" data-tab="desktop">Desktop</button>
         <button class="sh-tabs-trigger session-tab" data-tab="terminal">Terminal</button>
         <button class="sh-tabs-trigger session-tab" data-tab="files">Files</button>
         <button class="sh-tabs-trigger session-tab" data-tab="processes">Processes</button>
       </div>
-    </div>
 
-    <!-- Right Controls -->
-    <div class="header-right">
-      <div id="homeStatusGroup" class="row-gap-sm">
-        <span id="privilegeBadge" class="sh-badge sh-badge-outline">Ready</span>
-      </div>
-
-      <div id="sessionToolbar" class="row-gap-sm hidden">
-        <select id="sessionQualitySelect" class="sh-select sh-select-sm" title="Image Quality">
+      <div class="row-gap-sm">
+        <select id="sessionQualitySelect" class="sh-select" title="Quality">
           <option value="crisp">Crisp</option>
           <option value="balanced">Balanced</option>
           <option value="low">Low Data</option>
         </select>
-        <button id="fitWindowBtn" class="sh-btn sh-btn-outline sh-btn-sm" title="Match Windows resolution to this window">
-          Fit Display
-        </button>
-        <button id="curtainBtn" class="sh-btn sh-btn-outline sh-btn-sm" title="Blank physical PC monitor while working remotely">
-          Blank PC
-        </button>
-        <button id="sasBtn" class="sh-btn sh-btn-outline sh-btn-sm" title="Send Ctrl+Alt+Del">
-          Ctrl+Alt+Del
-        </button>
+        <button id="fitWindowBtn" class="sh-btn sh-btn-outline sh-btn-sm">Fit Display</button>
+        <button id="curtainBtn" class="sh-btn sh-btn-outline sh-btn-sm">Blank PC</button>
+        <button id="sasBtn" class="sh-btn sh-btn-outline sh-btn-sm">Ctrl+Alt+Del</button>
+      </div>
+    </header>
+
+    <!-- Tab 1: Desktop Canvas -->
+    <div id="tabDesktop" class="session-pane">
+      <div id="desktopViewport" class="desktop-viewport" tabindex="0">
+        <canvas id="desktopCanvas"></canvas>
+        <div id="desktopLoadingOverlay" class="desktop-overlay">
+          <div class="sh-spinner"></div>
+          <div class="footer-muted">Connecting to remote desktop...</div>
+        </div>
       </div>
     </div>
-  </header>
 
-  <!-- Toast Banner -->
-  <div id="bannerBar" class="sh-toast hidden">
-    <span id="bannerText"></span>
-    <button id="bannerCloseBtn" class="sh-btn sh-btn-ghost sh-btn-icon-sm">✕</button>
+    <!-- Tab 2: Remote Terminal -->
+    <div id="tabTerminal" class="session-pane hidden">
+      <div class="pane-wrap">
+        <div class="sh-card pane-card">
+          <div class="pane-bar">
+            <div class="row-gap-sm">
+              <select id="termShellSelect" class="sh-select">
+                <option value="powershell">PowerShell</option>
+                <option value="cmd">CMD</option>
+              </select>
+              <span class="footer-muted">Remote execution</span>
+            </div>
+            <button id="clearTermBtn" class="sh-btn sh-btn-ghost sh-btn-sm">Clear</button>
+          </div>
+          <pre id="termOutput" class="term-output"></pre>
+          <div class="row-gap pt-3">
+            <input
+              id="termInput"
+              type="text"
+              class="sh-input flex-1 mono"
+              placeholder="Enter PowerShell or CMD command..."
+            />
+            <button id="sendTermBtn" class="sh-btn sh-btn-primary">Run</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Remote Files -->
+    <div id="tabFiles" class="session-pane hidden">
+      <div class="pane-wrap">
+        <div class="sh-card pane-card">
+          <div class="pane-bar">
+            <div class="row-gap-sm flex-1">
+              <button id="fileDrivesBtn" class="sh-btn sh-btn-outline sh-btn-sm">Drives</button>
+              <button id="fileUpBtn" class="sh-btn sh-btn-outline sh-btn-sm">↑ Up</button>
+              <code id="fileCurrentPath" class="path-code flex-1 truncate">Computer</code>
+            </div>
+            <div class="row-gap-sm">
+              <button id="fileUploadBtn" class="sh-btn sh-btn-primary sh-btn-sm">Upload</button>
+              <button id="fileRefreshBtn" class="sh-btn sh-btn-outline sh-btn-sm">Refresh</button>
+            </div>
+          </div>
+          <div id="fileListContainer" class="table-scroll"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Remote Processes -->
+    <div id="tabProcesses" class="session-pane hidden">
+      <div class="pane-wrap">
+        <div class="sh-card pane-card">
+          <div class="pane-bar">
+            <span class="field-label">Running Processes</span>
+            <div class="row-gap-sm">
+              <button id="syncClipBtn" class="sh-btn sh-btn-outline sh-btn-sm">Sync Clipboard</button>
+              <button id="powerLockBtn" class="sh-btn sh-btn-outline sh-btn-sm">Lock PC</button>
+              <button id="powerRestartBtn" class="sh-btn sh-btn-destructive sh-btn-sm">Restart PC</button>
+              <button id="procRefreshBtn" class="sh-btn sh-btn-outline sh-btn-sm">Refresh</button>
+            </div>
+          </div>
+          <div id="procListContainer" class="table-scroll"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Main Workspace -->
-  <main class="app-main">
-    <!-- =================================================================== -->
-    <!-- 1. REMOTE CONTROL VIEW (Connect to a PC)                            -->
-    <!-- =================================================================== -->
-    <section id="clientHomeView" class="center-container">
-      <div class="section-intro">
-        <div>
-          <h1 class="sh-h1">Remote Control</h1>
-          <p class="sh-muted">Connect to your Windows PC over LAN or Tailscale with zero idle bandwidth.</p>
-        </div>
-        <button id="refreshPcsBtn" class="sh-btn sh-btn-outline sh-btn-sm">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-          <span>Refresh</span>
-        </button>
-      </div>
-
-      <!-- Inline Add PC Bar -->
-      <div class="sh-card p-4">
-        <div class="row-gap">
-          <input
-            id="addPcAddressInput"
-            type="text"
-            class="sh-input flex-1"
-            placeholder="Enter PC IP or Tailscale address (e.g. 100.x.x.x or 192.168.1.x)"
-          />
-          <button id="confirmAddPcBtn" class="sh-btn sh-btn-primary">Add PC</button>
-        </div>
-      </div>
-
-      <!-- Saved Computers List -->
-      <div id="pcCardsGrid" class="stack-sm"></div>
-
-      <!-- Empty State -->
-      <div id="emptyPcState" class="sh-empty hidden">
-        <p class="sh-muted">No PCs added yet. Enter your PC's IP address above to connect.</p>
-      </div>
-    </section>
-
-    <!-- =================================================================== -->
-    <!-- 2. SHARE THIS PC VIEW (Windows Host)                                -->
-    <!-- =================================================================== -->
-    <section id="hostView" class="center-container hidden">
-      <div class="section-intro">
-        <div>
-          <h1 class="sh-h1">Share This PC</h1>
-          <p class="sh-muted">Allow your Mac or another PC to take over this computer.</p>
-        </div>
-        <span id="hostEngineBadge" class="sh-badge sh-badge-secondary">Starting...</span>
-      </div>
-
-      <!-- Single Unified Host Card -->
-      <div class="sh-card stack-divider">
-        <!-- Row 1: This PC's Address -->
-        <div class="card-row">
-          <div>
-            <div class="sh-label">This PC's Address</div>
-            <div class="sh-desc">Enter this address in Orbit on your Mac.</div>
-          </div>
-          <div class="row-gap-sm">
-            <code id="hostPrimaryIp" class="sh-code">127.0.0.1</code>
-            <button id="copyPrimaryIpBtn" class="sh-btn sh-btn-outline sh-btn-sm">Copy</button>
-          </div>
-        </div>
-
-        <!-- Row 2: Pair with 4-Digit Code -->
-        <div class="card-row">
-          <div>
-            <div class="row-gap-sm">
-              <span class="sh-label">Pair a Device</span>
-              <span id="pendingPairBadge" class="sh-badge sh-badge-green hidden">Waiting for PIN</span>
-            </div>
-            <div id="pendingPairHint" class="sh-desc">Click Pair on your Mac, then enter the 4-digit PIN here.</div>
-          </div>
-          <div class="row-gap-sm">
-            <input
-              id="hostPinInput"
-              type="text"
-              maxlength="4"
-              inputmode="numeric"
-              class="sh-input pin-input"
-              placeholder="0000"
-            />
-            <button id="hostPairBtn" class="sh-btn sh-btn-primary">Pair</button>
-          </div>
-        </div>
-
-        <!-- Row 3: System & UAC Access -->
-        <div class="card-row">
-          <div>
-            <div class="sh-label">Administrator &amp; UAC Control</div>
-            <div id="adminAccessDesc" class="sh-desc">Allows controlling UAC prompts, Lock Screen, and Windows Firewall.</div>
-          </div>
-          <div class="row-gap-sm">
-            <span id="systemAccessBadge" class="sh-badge sh-badge-outline">Standard</span>
-            <button id="enableSystemAccessBtn" class="sh-btn sh-btn-secondary sh-btn-sm">Enable</button>
-          </div>
-        </div>
-
-        <!-- Row 4: Keep Awake Switch -->
-        <div class="card-row">
-          <div>
-            <div class="sh-label">Keep PC Awake</div>
-            <div class="sh-desc">Prevent Windows from sleeping while Orbit is open.</div>
-          </div>
-          <label class="sh-switch">
-            <input id="keepAwakeToggle" type="checkbox" checked />
-            <span class="sh-switch-slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Paired Devices Card -->
-      <div id="pairedDevicesCard" class="sh-card p-5 hidden">
-        <div class="sh-label mb-3">Paired Devices</div>
-        <div id="pairedClientsList" class="stack-xs"></div>
-      </div>
-    </section>
-
-    <!-- =================================================================== -->
-    <!-- 3. ACTIVE TAKEOVER SESSION VIEW                                     -->
-    <!-- =================================================================== -->
-    <section id="sessionView" class="session-view hidden">
-      <!-- Tab 1: Interactive Desktop Canvas -->
-      <div id="tabDesktop" class="session-pane active">
-        <div id="desktopViewport" class="desktop-viewport" tabindex="0">
-          <canvas id="desktopCanvas"></canvas>
-          <div id="desktopLoadingOverlay" class="desktop-overlay">
-            <div class="sh-spinner"></div>
-            <div class="sh-muted">Connecting to remote desktop...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 2: Remote Terminal -->
-      <div id="tabTerminal" class="session-pane hidden">
-        <div class="pane-container">
-          <div class="sh-card pane-card">
-            <div class="pane-header">
-              <div class="row-gap-sm">
-                <select id="termShellSelect" class="sh-select sh-select-sm">
-                  <option value="powershell">PowerShell</option>
-                  <option value="cmd">CMD</option>
-                </select>
-                <span class="sh-desc">Runs directly on the remote PC</span>
-              </div>
-              <button id="clearTermBtn" class="sh-btn sh-btn-ghost sh-btn-sm">Clear</button>
-            </div>
-            <pre id="termOutput" class="term-output"></pre>
-            <div class="row-gap pt-3">
-              <input
-                id="termInput"
-                type="text"
-                class="sh-input flex-1 mono"
-                placeholder="Type a command and press Enter..."
-              />
-              <button id="sendTermBtn" class="sh-btn sh-btn-primary">Run</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 3: Remote Files -->
-      <div id="tabFiles" class="session-pane hidden">
-        <div class="pane-container">
-          <div class="sh-card pane-card">
-            <div class="pane-header">
-              <div class="row-gap-sm flex-1">
-                <button id="fileDrivesBtn" class="sh-btn sh-btn-outline sh-btn-sm">Drives</button>
-                <button id="fileUpBtn" class="sh-btn sh-btn-outline sh-btn-sm">↑ Up</button>
-                <code id="fileCurrentPath" class="sh-code flex-1 truncate">Computer</code>
-              </div>
-              <div class="row-gap-sm">
-                <button id="fileUploadBtn" class="sh-btn sh-btn-primary sh-btn-sm">Upload</button>
-                <button id="fileRefreshBtn" class="sh-btn sh-btn-outline sh-btn-sm">Refresh</button>
-              </div>
-            </div>
-            <div id="fileListContainer" class="sh-table-scroll"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 4: Remote Processes -->
-      <div id="tabProcesses" class="session-pane hidden">
-        <div class="pane-container">
-          <div class="sh-card pane-card">
-            <div class="pane-header">
-              <span class="sh-label">Processes</span>
-              <div class="row-gap-sm">
-                <button id="syncClipBtn" class="sh-btn sh-btn-outline sh-btn-sm">Sync Clipboard</button>
-                <button id="powerLockBtn" class="sh-btn sh-btn-outline sh-btn-sm">Lock PC</button>
-                <button id="powerRestartBtn" class="sh-btn sh-btn-destructive sh-btn-sm">Restart PC</button>
-                <button id="procRefreshBtn" class="sh-btn sh-btn-outline sh-btn-sm">Refresh</button>
-              </div>
-            </div>
-            <div id="procListContainer" class="sh-table-scroll"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Minimal shadcn Dialog: 4-Digit Pairing Code -->
+  <!-- Pairing PIN Modal -->
   <div id="pairPinModal" class="sh-dialog-backdrop hidden">
     <div class="sh-dialog">
-      <h2 class="sh-dialog-title">Pair with PC</h2>
-      <p class="sh-desc mt-1">
+      <div class="field-label">Pair with PC</div>
+      <p class="field-hint mt-1">
         Enter this 4-digit PIN in Orbit on <strong id="pairModalHostLabel">your PC</strong>:
       </p>
       <div id="pairModalPinDisplay" class="pin-hero">----</div>
-      <div class="sh-dialog-footer">
-        <button id="cancelPairModalBtn" class="sh-btn sh-btn-outline">Cancel</button>
+      <div class="dialog-footer">
+        <button id="cancelPairModalBtn" class="sh-btn sh-btn-outline sh-btn-sm">Cancel</button>
       </div>
     </div>
   </div>

@@ -1,24 +1,20 @@
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #09090b;
-  --card-foreground: #fafafa;
-  --popover: #09090b;
-  --popover-foreground: #fafafa;
+  --bg: #09090b;
+  --card: #0c0c0f;
+  --card-footer: #09090b;
+  --fg: #fafafa;
+  --muted: #a1a1aa;
+  --subtle: #71717a;
+  --border: #1f1f24;
+  --border-strong: #27272d;
+  --input-bg: #121216;
   --primary: #fafafa;
-  --primary-foreground: #18181b;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #fafafa;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #d4d4d8;
-  --radius: 0.5rem;
+  --primary-fg: #09090b;
+  --secondary: #1e1e24;
+  --secondary-hover: #27272f;
+  --emerald: #10b981;
+  --radius: 12px;
+  --radius-sm: 8px;
 }
 
 * {
@@ -31,9 +27,10 @@ html,
 body {
   width: 100%;
   height: 100%;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg);
+  background-image: radial-gradient(700px circle at 50% -120px, rgba(120, 140, 255, 0.065), transparent 70%);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
@@ -46,121 +43,246 @@ body {
 }
 
 /* ============================================================================
-   Header (shadcn Minimal Top Bar)
+   Home Shell (Centered 520px Aligned Layout)
    ============================================================================ */
-.app-header {
-  height: 56px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(9, 9, 11, 0.85);
-  backdrop-filter: blur(12px);
+.home-shell {
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.home-container {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.home-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-}
-
-.header-left,
-.header-center,
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  padding: 0 2px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   object-fit: cover;
-  box-shadow: 0 0 12px rgba(96, 239, 255, 0.22);
+  box-shadow: 0 2px 14px rgba(96, 239, 255, 0.22);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .brand-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--foreground);
+  line-height: 1.2;
+}
+
+.status-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52525b;
+}
+
+.dot.online {
+  background: var(--emerald);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.55);
 }
 
 /* ============================================================================
-   shadcn Primitives
+   shadcn Card & Sections
    ============================================================================ */
-.sh-h1 {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  color: var(--foreground);
-}
-
-.sh-muted {
-  font-size: 13px;
-  color: var(--muted-foreground);
-}
-
-.sh-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--foreground);
-}
-
-.sh-desc {
-  font-size: 13px;
-  color: var(--muted-foreground);
-  margin-top: 2px;
-}
-
 .sh-card {
   background: var(--card);
-  color: var(--card-foreground);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
 }
 
-/* Buttons */
+.card-body {
+  padding: 22px;
+}
+
+.card-footer {
+  background: var(--card-footer);
+  border-top: 1px solid var(--border);
+  padding: 13px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.footer-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-check {
+  color: var(--emerald);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.footer-muted {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.sh-divider {
+  height: 1px;
+  background: var(--border);
+  width: 100%;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.field-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.field-hint.active-wait {
+  color: #34d399;
+  font-weight: 500;
+}
+
+/* Address Copy Box */
+.input-Copy-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px 8px 14px;
+}
+
+.ip-value {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+  user-select: text;
+}
+
+/* ============================================================================
+   shadcn Controls (Tabs, Buttons, Inputs, Switch)
+   ============================================================================ */
+.sh-tabs-list {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  background: #121216;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+
+.sh-tabs-trigger {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.sh-tabs-trigger:hover {
+  color: var(--fg);
+}
+
+.sh-tabs-trigger.active {
+  background: #232329;
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
 .sh-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 16px;
   font-size: 13px;
   font-weight: 500;
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, opacity 0.12s ease;
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
 }
 
 .sh-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   pointer-events: none;
 }
 
 .sh-btn-sm {
-  height: 32px;
+  height: 30px;
   padding: 0 11px;
-  font-size: 12.5px;
-}
-
-.sh-btn-icon-sm {
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  font-size: 12px;
+  border-radius: 6px;
 }
 
 .sh-btn-primary {
   background: var(--primary);
-  color: var(--primary-foreground);
+  color: var(--primary-fg);
 }
 
 .sh-btn-primary:hover {
@@ -169,184 +291,124 @@ body {
 
 .sh-btn-secondary {
   background: var(--secondary);
-  color: var(--secondary-foreground);
+  color: var(--fg);
+  border-color: #2c2c35;
 }
 
 .sh-btn-secondary:hover {
-  background: #3f3f46;
+  background: var(--secondary-hover);
 }
 
 .sh-btn-outline {
   background: transparent;
-  border-color: var(--border);
-  color: var(--foreground);
+  border-color: var(--border-strong);
+  color: var(--fg);
 }
 
 .sh-btn-outline:hover {
-  background: var(--accent);
+  background: var(--secondary);
 }
 
 .sh-btn-ghost {
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--muted);
 }
 
 .sh-btn-ghost:hover {
-  background: var(--accent);
-  color: var(--foreground);
+  background: var(--secondary);
+  color: var(--fg);
 }
 
 .sh-btn-destructive {
-  background: var(--destructive);
-  color: var(--destructive-foreground);
+  background: #7f1d1d;
+  color: #fafafa;
 }
 
 .sh-btn-destructive:hover {
   background: #991b1b;
 }
 
-/* Inputs & Selects */
-.sh-input {
-  height: 36px;
-  width: 100%;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid var(--input);
+.sh-link-btn {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sh-link-btn:hover {
+  color: #d4d4d8;
+}
+
+.sh-btn-icon {
   background: transparent;
-  padding: 0 12px;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.sh-btn-icon:hover {
+  color: var(--fg);
+  background: var(--secondary);
+}
+
+.sh-input {
+  height: 38px;
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 13px;
   font-size: 13.5px;
-  color: var(--foreground);
+  color: var(--fg);
   outline: none;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color 0.12s ease;
 }
 
 .sh-input::placeholder {
-  color: #71717a;
+  color: var(--subtle);
 }
 
 .sh-input:focus {
-  border-color: #71717a;
-  box-shadow: 0 0 0 1px #52525b;
+  border-color: #63636e;
 }
 
-.pin-input {
-  width: 96px;
-  text-align: center;
+.pin-box {
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 3px;
+  letter-spacing: 0.04em;
 }
 
 .sh-select {
-  height: 36px;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid var(--input);
-  background: #121215;
-  color: var(--foreground);
-  padding: 0 10px;
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
-}
-
-.sh-select-sm {
-  height: 32px;
-  font-size: 12.5px;
-}
-
-/* Tabs (shadcn TabsList & TabsTrigger) */
-.sh-tabs-list {
-  display: inline-flex;
-  height: 36px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius);
-  background: #18181b;
-  border: 1px solid #27272a;
-  padding: 3px;
-}
-
-.sh-tabs-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  border-radius: calc(var(--radius) - 3px);
-  padding: 0 12px;
-  height: 28px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted-foreground);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-
-.sh-tabs-trigger:hover {
-  color: var(--foreground);
-}
-
-.sh-tabs-trigger.active {
-  background: #27272a;
-  color: var(--foreground);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-/* Badges */
-.sh-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 8.5px;
-  font-size: 11.5px;
-  font-weight: 500;
-  border-radius: 9999px;
-  border: 1px solid transparent;
-}
-
-.sh-badge-secondary {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-}
-
-.sh-badge-outline {
-  border-color: var(--border);
-  color: var(--muted-foreground);
-}
-
-.sh-badge-green {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.28);
-  color: #34d399;
-}
-
-.sh-badge-amber {
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.32);
-  color: #fbbf24;
-}
-
-/* Code Pill */
-.sh-code {
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 13px;
-  background: #18181b;
-  border: 1px solid var(--border);
-  padding: 4px 10px;
+  height: 30px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  color: var(--foreground);
-  user-select: text;
+  color: var(--fg);
+  padding: 0 9px;
+  font-size: 12px;
+  outline: none;
 }
 
-/* Switch (shadcn Switch) */
+/* Switch */
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .sh-switch {
   position: relative;
   display: inline-block;
-  width: 38px;
-  height: 22px;
-  cursor: pointer;
+  width: 34px;
+  height: 19px;
 }
 
 .sh-switch input {
@@ -358,7 +420,7 @@ body {
 .sh-switch-slider {
   position: absolute;
   inset: 0;
-  background-color: #27272a;
+  background-color: #27272d;
   border-radius: 999px;
   transition: 0.15s ease;
 }
@@ -366,8 +428,8 @@ body {
 .sh-switch-slider::before {
   content: "";
   position: absolute;
-  height: 16px;
-  width: 16px;
+  height: 13px;
+  width: 13px;
   left: 3px;
   bottom: 3px;
   background-color: #a1a1aa;
@@ -376,73 +438,63 @@ body {
 }
 
 .sh-switch input:checked + .sh-switch-slider {
-  background-color: var(--primary);
+  background-color: var(--fg);
 }
 
 .sh-switch input:checked + .sh-switch-slider::before {
-  transform: translateX(16px);
-  background-color: var(--primary-foreground);
+  transform: translateX(15px);
+  background-color: var(--bg);
 }
 
 /* ============================================================================
-   Layout Helpers
+   List Items (Paired Devices & Remote PCs)
    ============================================================================ */
-.app-main {
-  height: calc(100vh - 56px);
-  overflow-y: auto;
-}
-
-.center-container {
-  max-width: 580px;
-  margin: 0 auto;
-  padding: 36px 20px 56px;
+.paired-item,
+.pc-item {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.section-intro {
-  display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 4px;
+  padding: 10px 13px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
-.p-4 {
-  padding: 16px;
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-.p-5 {
-  padding: 20px;
-}
-
-.pt-3 {
-  padding-top: 12px;
-}
-
-.mb-3 {
-  margin-bottom: 12px;
-}
-
-.mt-1 {
-  margin-top: 4px;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.truncate {
+.item-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.mono {
+.item-sub {
+  font-size: 12px;
+  color: var(--muted);
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 }
 
+.empty-box {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================================================
+   Utilities
+   ============================================================================ */
 .row-gap {
   display: flex;
   align-items: center;
@@ -455,129 +507,103 @@ body {
   gap: 8px;
 }
 
-.stack-sm {
+.stack-lg {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
+}
+
+.stack-md {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .stack-xs {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.stack-divider > .card-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
+.flex-1 {
+  flex: 1;
 }
 
-.stack-divider > .card-row:last-child {
-  border-bottom: none;
+.mb-4 {
+  margin-bottom: 14px;
 }
 
-/* Saved PC Item Row */
-.pc-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 18px;
+.mt-1 {
+  margin-top: 4px;
 }
 
-.pc-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.pt-3 {
+  padding-top: 12px;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #52525b;
-  flex-shrink: 0;
-}
-
-.status-dot.online {
-  background: #10b981;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
-}
-
-.pc-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--foreground);
-}
-
-.pc-sub {
-  font-size: 12px;
-  color: var(--muted-foreground);
+.mono {
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 }
 
-.sh-empty {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 32px 20px;
-  text-align: center;
-}
-
-/* Paired Device Item */
-.paired-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  background: #121215;
-}
-
-/* Toast Notification */
-.sh-toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 60;
-  max-width: 420px;
-  background: #18181b;
-  border: 1px solid #3f3f46;
-  color: var(--foreground);
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================================================
-   Active Takeover Session Views
+   Active Session View (Full Window)
    ============================================================================ */
-.session-view {
+.session-shell {
   width: 100%;
-  height: calc(100vh - 56px);
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #000;
+}
+
+.session-header {
+  height: 48px;
+  padding: 0 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+}
+
+.session-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.uac-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  white-space: nowrap;
 }
 
 .session-pane {
-  width: 100%;
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .desktop-viewport {
   position: relative;
-  width: 100%;
-  height: 100%;
+  flex: 1;
   background: #000;
   display: flex;
   align-items: center;
@@ -590,7 +616,6 @@ body {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  cursor: default;
 }
 
 .desktop-overlay {
@@ -601,14 +626,14 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: rgba(9, 9, 11, 0.85);
+  background: rgba(9, 9, 11, 0.88);
 }
 
 .sh-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #27272a;
-  border-top-color: var(--foreground);
+  width: 22px;
+  height: 22px;
+  border: 2px solid #27272d;
+  border-top-color: var(--fg);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
 }
@@ -619,8 +644,8 @@ body {
   }
 }
 
-.pane-container {
-  max-width: 960px;
+.pane-wrap {
+  max-width: 920px;
   width: 100%;
   height: 100%;
   margin: 0 auto;
@@ -637,7 +662,7 @@ body {
   overflow: hidden;
 }
 
-.pane-header {
+.pane-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -646,12 +671,21 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.path-code {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
 .term-output {
   flex: 1;
   margin-top: 12px;
-  background: #050507;
+  background: #060608;
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: var(--radius-sm);
   padding: 12px;
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
   font-size: 12.5px;
@@ -661,9 +695,9 @@ body {
   user-select: text;
 }
 
-.sh-table-scroll {
+.table-scroll {
   flex: 1;
-  margin-top: 12px;
+  margin-top: 10px;
   overflow-y: auto;
 }
 
@@ -671,8 +705,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 12px;
-  border-bottom: 1px solid #18181b;
+  padding: 8px 10px;
+  border-bottom: 1px solid #16161a;
   border-radius: 6px;
 }
 
@@ -681,12 +715,29 @@ body {
 }
 
 /* ============================================================================
-   shadcn Dialog Modal
+   Toast & Modal
    ============================================================================ */
+.sh-toast {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 80;
+  background: #16161b;
+  border: 1px solid #2e2e38;
+  color: var(--fg);
+  padding: 9px 13px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
 .sh-dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -695,35 +746,28 @@ body {
 }
 
 .sh-dialog {
-  width: 380px;
-  background: var(--popover);
-  border: 1px solid var(--border);
+  width: 360px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 24px;
+  padding: 22px;
   box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
 }
 
-.sh-dialog-title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
 .pin-hero {
-  margin: 20px 0;
-  padding: 16px;
+  margin: 18px 0;
+  padding: 14px;
   text-align: center;
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 700;
-  letter-spacing: 10px;
-  background: #121215;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--foreground);
+  letter-spacing: 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
 }
 
-.sh-dialog-footer {
+.dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
 }
