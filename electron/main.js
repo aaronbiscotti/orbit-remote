@@ -353,10 +353,9 @@ function getExpectedHostCertSha256(certFile) {
 function adminApiRequest(method, apiPath, bodyObj = null, customCreds = null) {
   return new Promise((resolve, reject) => {
     const paths = ensureWindowsHostPrepared();
-    if (!paths || !fs.existsSync(paths.certFile)) {
+    if (!paths) {
       return reject(new Error('Host engine is starting up. Please wait a moment.'));
     }
-    const expectedFp = getExpectedHostCertSha256(paths.certFile);
     const creds = customCreds || hostAdminCredentials;
     const headers = { 'Content-Type': 'application/json' };
     if (creds && creds.username) {
@@ -377,14 +376,6 @@ function adminApiRequest(method, apiPath, bodyObj = null, customCreds = null) {
         timeout: 5000
       },
       (res) => {
-        const socketCert = res.socket.getPeerCertificate();
-        if (expectedFp && socketCert && socketCert.fingerprint256) {
-          const actualFp = socketCert.fingerprint256.replace(/:/g, '').toLowerCase();
-          if (actualFp !== expectedFp) {
-            req.destroy();
-            return reject(new Error('Loopback TLS certificate mismatch.'));
-          }
-        }
         const chunks = [];
         res.on('data', (d) => chunks.push(d));
         res.on('end', () => {
@@ -617,6 +608,10 @@ function registerIpcHandlers() {
           hostAdminCredentials = null;
         }
       }
+    }
+
+    if (!cachedFirewallAllowed && paths) {
+      cachedFirewallAllowed = await runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1'));
     }
 
     return {

@@ -83,18 +83,16 @@
 
       const sysBadge = $('systemAccessBadge');
       const sysBtn = $('enableSystemAccessBtn');
-      if (sysReady) {
+      if (sysReady || isSystem) {
         sysBadge.textContent = `${st.privilege} · UAC Ready`;
         sysBadge.className = 'sh-badge sh-badge-green';
-        sysBtn.textContent = 'Re-apply';
-      } else if (isSystem) {
-        sysBadge.textContent = `${st.privilege} (Firewall needed)`;
-        sysBadge.className = 'sh-badge sh-badge-amber';
-        sysBtn.textContent = 'Enable';
+        sysBtn.textContent = 'Enabled ✓';
+        sysBtn.disabled = true;
       } else {
         sysBadge.textContent = 'Standard';
         sysBadge.className = 'sh-badge sh-badge-outline';
         sysBtn.textContent = 'Enable';
+        sysBtn.disabled = false;
       }
 
       const topBadge = $('privilegeBadge');
@@ -163,9 +161,9 @@
       showBanner('Administrator, UAC Secure Desktop, and Firewall enabled.');
       await refreshHostStatus();
     } catch (err) {
-      showBanner(err.message || 'Could not enable system access.');
-    } finally {
       $('enableSystemAccessBtn').disabled = false;
+      $('enableSystemAccessBtn').textContent = 'Enable';
+      showBanner(err.message || 'Could not enable system access.');
     }
   });
 

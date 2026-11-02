@@ -17,30 +17,28 @@ try {
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'SoftwareSASGeneration' -Value 3 -Type DWord -Force -ErrorAction SilentlyContinue
 } catch {}
 
-# Stop existing session agent instance before starting SYSTEM service / elevated replacement
-$orbitExisting = @(Get-Process -Name sunshine -ErrorAction SilentlyContinue | Where-Object { $_.Path -and [string]::Equals([IO.Path]::GetFullPath($_.Path), $exe, [StringComparison]::OrdinalIgnoreCase) })
-foreach ($orbitProcess in $orbitExisting) {
-    Stop-Process -Id $orbitProcess.Id -Force -ErrorAction SilentlyContinue
-    [void]$orbitProcess.WaitForExit(5000)
-    $orbitProcess.Dispose()
-}
-
-# Register and start persistent LocalSystem service (OrbitHostService) so UAC Secure Desktop (WinSta0\Winlogon) and Lock Screen are accessible
+# Stop existing service and ALL running sunshine/Orbit.Host instances across the PC so ports 47990/47995 are freed
 $serviceName = 'OrbitHostService'
-$binPath = "`"$serviceExe`" --service"
 $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+if ($existingService) {
+    & sc.exe stop $serviceName | Out-Null
+    Start-Sleep -Milliseconds 500
+}
+Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+
+# Register and start persistent LocalSystem service (OrbitHostService)
+$binPath = "`"$serviceExe`" --service"
 if (!$existingService) {
     & sc.exe create $serviceName binPath= $binPath start= auto obj= LocalSystem DisplayName= "Orbit Remote OS Takeover Service" | Out-Null
 } else {
-    & sc.exe stop $serviceName | Out-Null
-    Start-Sleep -Milliseconds 600
     & sc.exe config $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
 }
 & sc.exe start $serviceName | Out-Null
 Start-Sleep -Milliseconds 1500
 
 # Verify if the SYSTEM service spawned the console session agent; if not, start elevated administrator agent directly
-$runningAfterService = @(Get-Process -Name sunshine -ErrorAction SilentlyContinue | Where-Object { $_.Path -and [string]::Equals([IO.Path]::GetFullPath($_.Path), $exe, [StringComparison]::OrdinalIgnoreCase) })
+$runningAfterService = @(Get-Process -Name sunshine -ErrorAction SilentlyContinue)
 if ($runningAfterService.Count -eq 0) {
     $orbitStarted = Start-Process -FilePath $exe -ArgumentList ('"' + $config + '"') -WorkingDirectory $engineRoot -WindowStyle Hidden -PassThru
     try {

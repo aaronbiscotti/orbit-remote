@@ -15,6 +15,7 @@
   "build": {
     "appId": "local.orbit.remote",
     "productName": "Orbit",
+    "asar": false,
     "directories": {
       "output": "dist/electron"
     },
