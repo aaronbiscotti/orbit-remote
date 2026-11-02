@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Top Bar -->
+  <header id="topBar" class="top-bar">
+    <div class="brand-group">
+      <button id="disconnectBtn" class="btn btn-subtle hidden">← Disconnect</button>
+      <div class="logo-circle">◌</div>
+      <div>
+        <div class="brand-row">
+          <span id="headerTitle" class="brand-title">Orbit</span>
+          <span id="privilegeBadge" class="badge badge-green hidden">✓ SYSTEM · UAC Ready</span>
+          <span id="uacAlertBadge" class="badge badge-amber hidden">⚡ UAC / Lock Screen Active</span>
+        </div>
+        <div id="headerSubtitle" class="brand-subtitle">Remote OS Takeover · Zero idle bitrate</div>
+      </div>
+    </div>
+
+    <!-- Mode Switcher (when not in active session) -->
+    <div id="homeHeaderControls" class="header-controls">
+      <div id="roleSwitchGroup" class="seg-group hidden">
+        <button id="modeHostBtn" class="seg-btn active">Share This PC (Host)</button>
+        <button id="modeClientBtn" class="seg-btn">Control a PC (Client)</button>
+      </div>
+      <div id="clientHomeButtons" class="row-gap hidden">
+        <select id="homeQualitySelect" class="select-pill">
+          <option value="crisp">Quality: Crisp Lossless Text (0 KB/s idle)</option>
+          <option value="balanced">Quality: Balanced Adaptive</option>
+          <option value="low">Quality: Low Bandwidth (Cellular)</option>
+        </select>
+        <button id="refreshPcsBtn" class="btn btn-subtle">Refresh</button>
+        <button id="openAddPcBtn" class="btn btn-accent">+ Add PC</button>
+      </div>
+    </div>
+
+    <!-- Connected Session Controls -->
+    <div id="sessionHeaderControls" class="header-controls hidden">
+      <div class="seg-group">
+        <button class="seg-btn session-tab active" data-tab="desktop">Desktop</button>
+        <button class="seg-btn session-tab" data-tab="terminal">Terminal</button>
+        <button class="seg-btn session-tab" data-tab="files">Files</button>
+        <button class="seg-btn session-tab" data-tab="processes">Processes</button>
+      </div>
+      <button id="sasBtn" class="btn btn-subtle" title="Send Ctrl+Alt+Del to unlock or approve UAC">Ctrl+Alt+Del</button>
+      <button id="curtainBtn" class="btn btn-subtle" title="Blank physical PC monitor while working remotely">Blank PC Screen</button>
+      <button id="fitWindowBtn" class="btn btn-subtle" title="Resize Windows resolution to fit this window">Fit Window</button>
+      <button id="syncClipBtn" class="btn btn-subtle" title="Sync clipboard to PC">Sync Clipboard</button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="main-area">
+    <!-- 1. WINDOWS HOST MODE VIEW -->
+    <section id="hostView" class="view-container hidden">
+      <div class="host-shell">
+        <div class="card host-banner">
+          <div>
+            <div id="hostComputerName" class="card-title-lg">THIS-PC</div>
+            <div id="hostNetworkHint" class="muted-text">Checking network address…</div>
+          </div>
+          <div id="hostStatusPill" class="status-pill">● OS Takeover ready</div>
+        </div>
+
+        <div class="steps-grid">
+          <div id="stepBadge1" class="step-pill active">1 &nbsp;Protect PC</div>
+          <div id="stepBadge2" class="step-pill">2 &nbsp;Allow access</div>
+          <div id="stepBadge3" class="step-pill">3 &nbsp;Connect Mac</div>
+        </div>
+
+        <!-- Step 1: Login / Unlock -->
+        <div id="hostStep1" class="card step-card">
+          <h2 id="hostLoginTitle">Protect your PC</h2>
+          <p id="hostLoginHint" class="muted-text">Choose a password to approve your Mac.</p>
+          <label class="field-label">Username</label>
+          <input id="hostUsername" class="text-input" type="text" value="orbit" />
+          <label class="field-label">Password</label>
+          <input id="hostPassword" class="text-input" type="password" placeholder="12 characters or more" />
+          <div class="row-end">
+            <button id="hostUnlockBtn" class="btn btn-accent">Save &amp; continue →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Firewall Permission -->
+        <div id="hostStep2" class="card step-card hidden">
+          <h2>Allow your Mac to connect</h2>
+          <p class="muted-text">Windows will ask for administrator approval to allow LAN &amp; Tailscale takeover connections.</p>
+          <div class="info-box" id="hostFirewallBox">One click to allow encrypted OS Takeover connections on port 47995.</div>
+          <div class="row-end">
+            <button id="hostCheckFwBtn" class="btn btn-subtle">Check again</button>
+            <button id="hostAllowFwBtn" class="btn btn-accent">Allow connections →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Connect & Pair Mac -->
+        <div id="hostStep3" class="card step-card hidden">
+          <h2 id="hostConnectTitle">Now, on your Mac</h2>
+          <div id="hostInstructions">
+            <p class="muted-text">Open <strong>Orbit</strong> on your Mac, click <strong>+ Add PC</strong>, and enter this address:</p>
+            <div class="address-box">
+              <input id="hostAddressInput" class="text-input mono-lg" type="text" readonly value="127.0.0.1" />
+              <button id="hostCopyAddrBtn" class="btn btn-subtle">Copy address</button>
+            </div>
+            <p class="muted-text">Click your PC card on the Mac. A 4-digit pairing code will appear.</p>
+          </div>
+
+          <!-- Pending Pairing Approval -->
+          <div id="hostPairBox" class="pair-approval-box hidden">
+            <div class="field-label" id="hostPendingLabel">Enter the 4-digit code shown on your Mac:</div>
+            <div class="address-box">
+              <input id="hostPinInput" class="text-input mono-pin" type="text" maxlength="4" placeholder="0000" />
+              <button id="hostApprovePairBtn" class="btn btn-accent">Pair Mac →</button>
+            </div>
+          </div>
+
+          <!-- Paired Devices List -->
+          <div class="divider"></div>
+          <div class="row-between">
+            <span class="field-label">Paired Macs</span>
+            <span id="hostPairedCount" class="muted-text">0 paired</span>
+          </div>
+          <div id="hostPairedList" class="paired-list"></div>
+        </div>
+
+        <!-- Administrator & SYSTEM UAC Control Card -->
+        <div class="card host-banner">
+          <div>
+            <div id="hostAdminTitle" class="card-title-sm">OS Takeover &amp; UAC Prompts</div>
+            <div id="hostAdminHint" class="muted-text">Enable persistent SYSTEM &amp; Administrator control so you can see and click UAC prompts from your Mac.</div>
+          </div>
+          <button id="hostEnableAdminBtn" class="btn btn-subtle">Enable administrator control</button>
+        </div>
+
+        <label class="checkbox-row">
+          <input id="hostKeepAwakeCheck" type="checkbox" checked />
+          <span>Keep PC awake while Orbit is open</span>
+        </label>
+
+        <div id="hostStatusNotice" class="notice-line hidden"></div>
+      </div>
+    </section>
+
+    <!-- 2. CLIENT HOME VIEW (PC Grid) -->
+    <section id="clientHomeView" class="view-container hidden">
+      <div id="emptyPcState" class="empty-state">
+        <div class="empty-icon">⊞</div>
+        <h1>Take over your Windows PC</h1>
+        <p class="muted-text">
+          Open Orbit on your Windows PC and copy its address. Orbit sends only changed screen sub-tiles
+          (<strong>0 KB/s when static</strong>) and gives you full Administrator, UAC prompt, Terminal, and File control.
+        </p>
+        <button id="emptyAddPcBtn" class="btn btn-accent btn-lg">+ Add Windows PC →</button>
+        <p class="tiny-hint">Away from home? Connect Tailscale on both devices.</p>
+      </div>
+
+      <div id="pcCardsGrid" class="pc-grid hidden"></div>
+    </section>
+
+    <!-- 3. ACTIVE OS TAKEOVER SESSION VIEW -->
+    <section id="sessionView" class="view-container session-container hidden">
+      <!-- Tab: Desktop Canvas -->
+      <div id="tabDesktop" class="session-tab-pane">
+        <canvas id="desktopCanvas" tabindex="0"></canvas>
+      </div>
+
+      <!-- Tab: Remote Terminal -->
+      <div id="tabTerminal" class="session-tab-pane hidden">
+        <div class="panel-card">
+          <div class="row-between">
+            <strong id="terminalHeaderLabel">Remote Windows PowerShell</strong>
+            <button id="clearTermBtn" class="btn btn-subtle btn-sm">Clear</button>
+          </div>
+          <pre id="terminalOutput" class="terminal-output">Ready. Commands execute directly on your Windows PC with zero video bandwidth.</pre>
+          <div class="address-box">
+            <input id="terminalInput" class="text-input mono" type="text" placeholder="Run PowerShell command on PC (e.g. Get-Process, ipconfig, git status)…" />
+            <button id="runTermBtn" class="btn btn-accent">Run →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Remote File Browser & Transfer -->
+      <div id="tabFiles" class="session-tab-pane hidden">
+        <div class="panel-card">
+          <div class="address-box">
+            <button id="fsUpBtn" class="btn btn-subtle">↑ Up</button>
+            <button id="fsDrivesBtn" class="btn btn-subtle">Drives</button>
+            <input id="fsPathInput" class="text-input mono" type="text" placeholder="Windows path (e.g. C:\Users)" />
+            <button id="fsGoBtn" class="btn btn-subtle">Open</button>
+            <button id="fsUploadBtn" class="btn btn-accent">Upload File to PC…</button>
+          </div>
+          <div id="fsListContainer" class="list-scroll"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Remote Windows Task Manager -->
+      <div id="tabProcesses" class="session-tab-pane hidden">
+        <div class="panel-card">
+          <div class="row-between">
+            <strong id="procCountLabel">Windows Task Manager</strong>
+            <div class="row-gap">
+              <button id="refreshProcsBtn" class="btn btn-subtle btn-sm">Refresh</button>
+              <button id="lockPcBtn" class="btn btn-subtle btn-sm">Lock PC</button>
+              <button id="restartPcBtn" class="btn btn-danger btn-sm">Restart PC</button>
+            </div>
+          </div>
+          <div id="procListContainer" class="list-scroll"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add PC Modal -->
+  <div id="addPcModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h3>Add Windows PC</h3>
+      <p class="muted-text">Enter the LAN IP or Tailscale address shown in Orbit on your Windows PC.</p>
+      <input id="addPcAddressInput" class="text-input mono" type="text" placeholder="e.g. 100.64.1.2" />
+      <div class="row-end">
+        <button id="cancelAddPcBtn" class="btn btn-subtle">Cancel</button>
+        <button id="confirmAddPcBtn" class="btn btn-accent">Add PC →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4-Digit PIN Pairing Modal -->
+  <div id="pairModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h3 id="pairModalTitle">Pair with your PC</h3>
+      <p class="muted-text">Enter this 4-digit code in Orbit on your Windows PC and click <strong>Pair Mac</strong>.</p>
+      <div id="pairPinDisplay" class="pin-display">0000</div>
+      <div class="row-between">
+        <span class="muted-text">Waiting for approval on your PC…</span>
+        <button id="cancelPairModalBtn" class="btn btn-subtle">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Status Bar -->
+  <footer class="footer-bar">
+    <span id="footerStats">AVX2 SIMD Dirty-Tile Engine · 0.0 KB/s when screen is static</span>
+    <span id="footerNotice" class="footer-notice"></span>
+  </footer>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

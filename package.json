@@ -1,0 +1,77 @@
+{
+  "name": "orbit-remote",
+  "productName": "Orbit",
+  "version": "1.0.0",
+  "description": "High-performance Remote OS Takeover for Windows and macOS",
+  "main": "electron/main.js",
+  "author": "Aaron Tang",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke-test",
+    "dist:win": "electron-builder --win nsis zip --x64",
+    "dist:mac": "electron-builder --mac dmg zip --universal"
+  },
+  "build": {
+    "appId": "local.orbit.remote",
+    "productName": "Orbit",
+    "directories": {
+      "output": "dist/electron"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json",
+      "LICENSE",
+      "NOTICE"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/Orbit-Host",
+        "to": "engine",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "scripts",
+        "to": "scripts",
+        "filter": ["*.ps1"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        },
+        {
+          "target": "zip",
+          "arch": ["universal"]
+        }
+      ],
+      "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Orbit"
+    }
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12"
+  }
+}

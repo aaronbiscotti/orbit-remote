@@ -9,61 +9,55 @@ concurrency:
   group: orbit-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  host:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Test host integration
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Test native SIMD & UAC takeover engine
         run: dotnet run --project tests/Orbit.Tests -c Release
-      - name: Build Windows host
+      - name: Build native Windows engine
         run: dotnet publish host/Orbit.Host -c Release -r win-x64 --self-contained true -o dist/Orbit-Host
+      - name: Install Electron dependencies
+        run: npm install
+      - name: Smoke test Electron app
+        run: npm run smoke
+      - name: Build Windows Electron Installer (Setup.exe & ZIP)
+        run: npm run dist:win
       - uses: actions/upload-artifact@v4
         with:
-          name: Orbit-Host-Windows
-          path: dist/Orbit-Host
+          name: Orbit-Windows-Installer
+          path: |
+            dist/electron/*.exe
+            dist/electron/*.zip
           if-no-files-found: error
-  client:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-2025
-            platform: Windows
-          - os: macos-26
-            platform: macOS
-    runs-on: ${{ matrix.os }}
+
+  macos:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
-      - name: Apply native interface
-        run: python scripts/apply-client.py
-      - name: Verify reproducible overlay
-        run: python scripts/apply-client.py --check
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.2'
-          cache: true
-          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: runner.os == 'Windows'
-      - name: Build Windows client
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./scripts/build-client-windows.ps1
-      - name: Verify Windows client startup
-        if: runner.os == 'Windows'
-        run: python scripts/smoke-client.py dist/Orbit-Client-Windows/Orbit.exe
-      - name: Build universal Mac client
-        if: runner.os == 'macOS'
-        shell: bash
-        run: bash scripts/build-client-mac.sh
+          node-version: '22'
+          cache: 'npm'
+      - name: Prepare engine placeholder for macOS bundle
+        run: mkdir -p dist/Orbit-Host
+      - name: Install Electron dependencies
+        run: npm install
+      - name: Smoke test Electron app
+        run: npm run smoke
+      - name: Build Universal macOS Electron Installer (.dmg & .zip)
+        run: npm run dist:mac
       - uses: actions/upload-artifact@v4
         with:
-          name: Orbit-Client-${{ matrix.platform }}
-          path: dist/Orbit-Client-${{ matrix.platform }}
+          name: Orbit-macOS-Installer
+          path: |
+            dist/electron/*.dmg
+            dist/electron/*.zip
           if-no-files-found: error
