@@ -8,7 +8,7 @@ try {
         $app = $rule | Get-NetFirewallApplicationFilter
         if (![string]::Equals($app.Program, $exe, [StringComparison]::OrdinalIgnoreCase)) { exit 1 }
         $port = $rule | Get-NetFirewallPortFilter
-        $expected = if ($name -eq 'Orbit-Streaming-TCP') { @('47984','47989','48010') } else { @('47998','47999','48000','48002','48010') }
+        $expected = if ($name -eq 'Orbit-Streaming-TCP') { @('47984','47989','47995','48010') } else { @('47998','47999','48000','48002','48010') }
         $protocol = if ($name -eq 'Orbit-Streaming-TCP') { 'TCP' } else { 'UDP' }
         if ($port.Protocol -ne $protocol -or (($port.LocalPort | Sort-Object) -join ',') -ne (($expected | Sort-Object) -join ',')) { exit 1 }
         $addresses = @(($rule | Get-NetFirewallAddressFilter).RemoteAddress)

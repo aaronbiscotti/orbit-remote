@@ -1,7 +1,8 @@
-# Orbit client
+# Orbit Client
 
-Orbit is a native Qt client built from a pinned Moonlight engine. It uses the engine's existing device certificate pairing, hardware video decoding, input transport, and audio. It does not embed a browser or Electron.
+Orbit is a native Qt 6 (`QtCore`, `QtGui`, `QtNetwork`, `QtQml`, `QtQuick`, `QtQuickControls2`) remote OS takeover client for macOS (`Orbit.app`) and Windows (`Orbit.exe`). It does not embed a browser or Electron.
 
-`../scripts/apply-client.py` applies Orbit's interface and defaults to `../vendor/moonlight`. Changes are kept as reproducible overlays in this directory rather than silently modifying the upstream submodule. Run the script after initializing recursive submodules. The private repository contains all Orbit modifications; upstream license notices remain intact.
-
-The initial stream profile requests 1080p / 120 fps with automatic hardware decoding. Actual performance depends on the host, display refresh rate and network. Settings remain adjustable. One monitor streams at a time. Switch host displays using Ctrl+Alt+Shift+F1 through F12 (Mac: Control+Option+Shift+F-key, optionally Fn). Simultaneous monitor streams are not implemented.
+Instead of continuous video streaming, the client speaks Orbit's length-prefixed TLS takeover protocol (`47995`):
+- **Dirty-tile desktop canvas (`DesktopCanvas`)**: Receives only changed `128×128` tiles (`0 KB/s` when static) and sends `frame_ack` backpressure acknowledgements after each frame paint.
+- **Cryptographic 4-digit PIN pairing & server TLS pinning (`OrbitBackend`)**: Pairs using a SHA-256 server certificate commitment and authenticates sessions with channel-bound `HMAC-SHA256`.
+- **Full OS Takeover Controls**: Interactive desktop (`WinSta0\Default` and `WinSta0\Winlogon` UAC / Lock Screen), `Ctrl+Alt+Del` (`SendSAS`), physical PC Privacy Curtain (`WDA_EXCLUDEFROMCAPTURE`), dynamic window resolution matching, bidirectional clipboard sync, remote PowerShell/CMD terminal, remote file explorer & transfer, and remote Windows Task Manager.

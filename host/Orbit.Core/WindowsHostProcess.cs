@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 
 namespace Orbit.Core;
 
-public sealed record HostProcess(int Id, string Executable, bool? Elevated);
+public sealed record HostProcess(int Id, string Executable, bool? Elevated, bool IsSystem = false);
 
 public static class WindowsHostProcess
 {
@@ -24,12 +25,20 @@ public static class WindowsHostProcess
                     if (!QueryFullProcessImageName(handle, 0, path, ref size) ||
                         !string.Equals(Path.GetFullPath(path.ToString()), expected, StringComparison.OrdinalIgnoreCase)) continue;
                     bool? elevated = null;
+                    var isSystem = false;
                     if (OpenProcessToken(handle, 8, out var token)) {
                         try {
                             if (GetTokenInformation(token, 20, out var value, sizeof(int), out _)) elevated = value != 0;
+                            try {
+                                using var identity = new WindowsIdentity(token);
+                                if (identity.IsSystem) {
+                                    isSystem = true;
+                                    elevated = true;
+                                }
+                            } catch { }
                         } finally { CloseHandle(token); }
                     }
-                    result.Add(new HostProcess(process.Id, path.ToString(), elevated));
+                    result.Add(new HostProcess(process.Id, path.ToString(), elevated, isSystem));
                 } finally { CloseHandle(handle); }
             }
         }

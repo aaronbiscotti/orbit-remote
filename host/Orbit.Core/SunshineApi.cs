@@ -10,13 +10,14 @@ namespace Orbit.Core;
 
 public sealed record PairRequest(string Id, string Name, string Address);
 public sealed record PairedClient(string Id, string Name);
+public sealed record HostLiveStatus(string Privilege, string Desktop, bool SecureDesktop, int ActiveSessions);
 
-// This companion only talks to the loopback admin endpoint. The streaming engine
-// owns all remote authentication and cryptography. No remote control API is added.
+// This companion only talks to the loopback admin endpoint. The takeover engine
+// owns all remote authentication and cryptography.
 public sealed class SunshineApi : IDisposable
 {
     private readonly HttpClient client;
-    public SunshineApi(string username, string password, string certificatePath)
+    public SunshineApi(string username, string password, string certificatePath, int port = 47990)
     {
         using var trusted = X509Certificate2.CreateFromPem(File.ReadAllText(certificatePath));
         var expected = SHA256.HashData(trusted.RawData);
@@ -27,16 +28,16 @@ public sealed class SunshineApi : IDisposable
                 request.RequestUri?.Host == "127.0.0.1" && certificate != null &&
                 CryptographicOperations.FixedTimeEquals(expected, SHA256.HashData(certificate.RawData))
         };
-        client = CreateClient(handler, username, password);
+        client = CreateClient(handler, username, password, port);
     }
 
     // Used by integration tests to exercise request formats and fail-closed behavior.
     public SunshineApi(HttpMessageHandler handler, string username, string password) =>
-        client = CreateClient(handler, username, password);
+        client = CreateClient(handler, username, password, 47990);
 
-    private static HttpClient CreateClient(HttpMessageHandler handler, string username, string password)
+    private static HttpClient CreateClient(HttpMessageHandler handler, string username, string password, int port)
     {
-        var http = new HttpClient(handler) { BaseAddress = new Uri("https://127.0.0.1:47990/"), Timeout = TimeSpan.FromSeconds(35) };
+        var http = new HttpClient(handler) { BaseAddress = new Uri($"https://127.0.0.1:{port}/"), Timeout = TimeSpan.FromSeconds(35) };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + password)));
         return http;
@@ -53,6 +54,20 @@ public sealed class SunshineApi : IDisposable
     }
 
     public async Task VerifyLogin() => _ = await Read("api/config");
+
+    public async Task<HostLiveStatus> GetStatus()
+    {
+        var root = await Read("api/config");
+        var priv = Get(root, "privilege");
+        var desk = Get(root, "desktop");
+        var secure = root.TryGetProperty("secureDesktop", out var s) && s.ValueKind == JsonValueKind.True;
+        var sessions = root.TryGetProperty("activeSessions", out var a) && a.TryGetInt32(out var count) ? count : 0;
+        return new HostLiveStatus(
+            string.IsNullOrEmpty(priv) ? "Standard" : priv,
+            string.IsNullOrEmpty(desk) ? "Default" : desk,
+            secure,
+            sessions);
+    }
 
     public Task CreateInitialLogin(string username, string password)
     {

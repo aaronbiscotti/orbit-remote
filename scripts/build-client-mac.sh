@@ -1,31 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ENGINE="$ROOT/vendor/moonlight"
+CLIENT="$ROOT/client"
 BUILD="$ROOT/tools/client-build"
 DEPLOY="$ROOT/dist/Orbit-Client-macOS"
+rm -rf "$BUILD" "$DEPLOY"
 mkdir -p "$BUILD" "$DEPLOY"
-cd "$ENGINE"
-python3 setup-deps.py
 cd "$BUILD"
-qmake "$ENGINE/moonlight-qt.pro" CONFIG+=release QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64"
-make -j"$(sysctl -n hw.logicalcpu)" release
-macdeployqt "$BUILD/app/Moonlight.app" -qmldir="$ENGINE/app/gui" -appstore-compliant
-cp -R "$BUILD/app/Moonlight.app" "$BUILD/app/Orbit.app"
-python3 - "$BUILD/app/Orbit.app/Contents/Info.plist" <<'PY'
-import plistlib, sys
-path = sys.argv[1]
-with open(path, 'rb') as file:
-    data = plistlib.load(file)
-data.update(CFBundleName='Orbit', CFBundleDisplayName='Orbit', CFBundleIdentifier='local.orbit.remote')
-with open(path, 'wb') as file:
-    plistlib.dump(data, file)
-PY
-# A local development signature; notarization requires the owner's Apple account.
-codesign --force --deep --sign - "$BUILD/app/Orbit.app"
-codesign --verify --deep --strict --verbose=2 "$BUILD/app/Orbit.app"
-lipo -archs "$BUILD/app/Orbit.app/Contents/MacOS/Moonlight"
-python3 "$ROOT/scripts/smoke-client.py" "$BUILD/app/Orbit.app/Contents/MacOS/Moonlight"
-ditto -c -k --sequesterRsrc --keepParent "$BUILD/app/Orbit.app" "$DEPLOY/Orbit-macOS.zip"
+qmake "$CLIENT/orbit-client.pro" CONFIG+=release QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64"
+make -j"$(sysctl -n hw.logicalcpu)"
+macdeployqt "$BUILD/Orbit.app" -qmldir="$CLIENT/qml" -appstore-compliant
+codesign --force --deep --sign - "$BUILD/Orbit.app"
+codesign --verify --deep --strict --verbose=2 "$BUILD/Orbit.app"
+lipo -archs "$BUILD/Orbit.app/Contents/MacOS/Orbit"
+python3 "$ROOT/scripts/smoke-client.py" "$BUILD/Orbit.app/Contents/MacOS/Orbit"
+ditto -c -k --sequesterRsrc --keepParent "$BUILD/Orbit.app" "$DEPLOY/Orbit-macOS.zip"
 cp "$ROOT/NOTICE" "$DEPLOY/NOTICE.txt"
-cp "$ENGINE/LICENSE" "$DEPLOY/Moonlight-LICENSE.txt"
+cp "$ROOT/LICENSE" "$DEPLOY/LICENSE.txt"

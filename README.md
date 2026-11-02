@@ -1,56 +1,46 @@
 # Orbit
 
-A rounded, minimalist native remote-PC app for Windows → Mac. The Windows companion manages a local Sunshine host; the native client uses a pinned Moonlight engine with Orbit's interface and a requested 1080p / 120 fps profile. Your actual console desktop, audio, mouse, and keyboard are streamed. No Electron or browser runs inside the client.
+A rounded, minimalist native **Remote OS Takeover** app for Windows → Mac. Instead of continuous high-bitrate game streaming that freezes or blurs on fluctuating networks, Orbit uses an **event-driven dirty-tile desktop protocol** over pinned TLS (`0 KB/s` when static) paired with a **`LocalSystem` (`NT AUTHORITY\SYSTEM`) session takeover engine** and native Mac panels for Terminal, Files, and Task Manager.
 
-## First test
+## Why Remote OS Takeover instead of Video Streaming?
 
-1. Orbit Host guides you through **Protect PC → Allow access → Connect Mac**. Choose a password of at least 12 characters and click **Save & continue**. If Windows permission is needed, click **Allow connections** and approve the administrator prompt. Permission that is already enabled is detected automatically. For a portable installation, download the Windows host ZIP from the [private release](https://github.com/aaronbiscotti/orbit-remote/releases/latest), extract it, and open **Launch Orbit.cmd**. On later launches, enter your saved login and click **Unlock & continue**.
-2. Download the macOS ZIP from the [private release](https://github.com/aaronbiscotti/orbit-remote/releases/latest), extract it on the Mac, and move `Orbit.app` to Applications. It supports Apple Silicon and Intel Macs running macOS 13 or newer. This is a development build, locally signed, not Apple-notarized. If macOS blocks it, use the standard Privacy & Security “Open Anyway” flow for this app. Do not disable Gatekeeper globally.
-3. With both devices on the same network, click **Add PC** in Orbit on the Mac and enter the address shown on Orbit Host. Click the PC card. The Mac displays a four-digit pairing code.
-4. Orbit Host automatically shows the code field when your Mac requests pairing. Enter the code and click **Pair Mac**. If multiple devices are waiting, select the intended device first. The host validates the cryptographic handshake; a wrong code fails. Your client saves its device certificate for future connections.
-5. On the Mac, choose **Performance → Stable · 60 fps**, then click your PC and select **Desktop**. Once video works, disconnect and choose **Performance → Fast · 120 fps** to test the faster profile. Both profiles use 1080p, hardware H.264 decoding, and Metal on the Mac. Profile changes apply on the next connection. **Settings** provides advanced controls. The footer says **Requested**; it does not claim a measured 120 fps. Use Control+Option+Shift+S to toggle streaming statistics. Control+Option+Shift+Q disconnects.
+1. **Zero Idle Bitrate & Backpressure-Paced Dirty Tiles**:
+   - Only changed `128×128` screen regions are hashed, encoded (`PNG` for lossless crisp text or adaptive `JPEG`), and transmitted over TLS TCP (`47995`).
+   - When your Windows desktop is static, Orbit sends **0 KB/s**.
+   - Every frame delta waits for a lightweight `frame_ack` before sending the next delta, eliminating frame backlog, black screens, and UDP packet-loss corruption over Tailscale or weak Wi-Fi.
+2. **Full `SYSTEM` & UAC Administrator Prompt (`WinSta0\Winlogon`) Control**:
+   - Standard user or even elevated user-desktop streaming processes go blind when Windows switches to the **`WinSta0\Winlogon` Secure Desktop** for **UAC Administrator prompts** or the **Windows Lock / Login Screen**.
+   - Orbit's Windows host includes a native `LocalSystem` service (`OrbitHostService`) that spawns the session takeover agent inside the active console session (`WTSGetActiveConsoleSessionId()`) as `NT AUTHORITY\SYSTEM`, dynamically attaching its capture and input threads via `OpenInputDesktop` / `SetThreadDesktop` to both `WinSta0\Default` and `WinSta0\Winlogon`.
+   - You can see and click **"Yes" on UAC Administrator prompts**, interact with elevated Task Manager/apps, send `Ctrl+Alt+Delete` (`SendSAS`), and unlock the Windows Lock Screen remotely from your Mac.
+3. **Native OS Control Panels (Zero Video Bandwidth)**:
+   - **Desktop Takeover**: Interactive dirty-tile desktop with Mac `⌘ Command ⇄ Ctrl` shortcut translation, dynamic resolution matching (`Fit Window`), and a **Physical PC Privacy Curtain** (`WDA_EXCLUDEFROMCAPTURE`) that blanks your physical PC monitor while you work from your Mac.
+   - **Remote Terminal**: Execute PowerShell or CMD commands directly on your PC as Administrator/`SYSTEM` and read output as pure text.
+   - **Remote Files**: Browse Windows drives and folders, download files to your Mac (`~/Downloads`), and upload files from your Mac to your PC.
+   - **Remote Processes**: Inspect running Windows processes (with PID, RAM usage, and `Elevated` status), end stuck tasks, or lock/restart the PC.
 
-The client is a native Qt application, not a Swift client. Hardware decoding on macOS comes from Moonlight's VideoToolbox/Metal renderer. The performance presets require hardware decoding; advanced automatic settings can fall back to software with a warning. Fresh-install defaults request 1920×1080 at 120 fps with automatic codec/decoder selection, absolute mouse mode and Discord presence disabled. Saved settings are preserved until you choose a preset. Desktop mode keeps the Mac cursor visible; it may overlap the cursor encoded by the PC. Control+Option+Shift+C toggles local cursor visibility.
+## Quick Start
 
-The presets disable V-sync and frame pacing and keep only the newest waiting decoded frame to avoid accumulating renderer backlog. The frame currently used by the GPU retains its original lifetime protection. V-sync being disabled may produce tearing. This change does not repair lost network packets or guarantee a frame rate. The 60 fps preset requests 8 Mbps; the 120 fps preset requests 12 Mbps. No end-to-end performance measurements of this update on a physical Mac have been made yet.
+1. Open **Orbit Host** on your Windows PC. It guides you through **Protect PC → Allow access → Connect Mac**:
+   - **Protect PC**: Choose an Orbit Host password (at least 12 characters) and click **Save & continue**.
+   - **Allow access**: Click **Allow connections** and approve the Windows prompt to add scoped firewall rules (`LocalSubnet` and Tailscale `100.64.0.0/10` on TCP port `47995`).
+   - **Enable Administrator & UAC Takeover**: Click **Enable administrator control** once while at the PC and approve UAC. This registers `OrbitHostService` (`LocalSystem`) and starts the `SYSTEM` session takeover agent so UAC prompts and elevated apps remain controllable while you are away.
+2. On your Mac, open `Orbit.app`, click **Add PC**, and enter your PC's LAN or Tailscale (`100.x.x.x`) address.
+3. Click **Pair This Mac →** on the PC card. A 4-digit pairing code appears on your Mac.
+4. Enter the 4-digit code in **Orbit Host** on your PC and click **Pair Mac →**. Orbit verifies the cryptographic commitment and pins both devices' identities.
+5. Click **Take Over PC →** on your Mac to take control of your Windows PC.
 
-## While away
-
-Install [Tailscale](https://tailscale.com/download) on the PC and Mac, sign in to the same account, and enter the PC's Tailscale address in **Add PC**. Use `tailscale ping <pc>` on the Mac to verify a direct connection. Relay connections can be too slow for high-bitrate video. No router port forwarding is configured. Sunshine's admin interface is limited to localhost; you manage device authorization locally on the PC.
-
-For your personal devices, use a personal account whose tailnet you control. A school or employer domain may place you in a shared organization tailnet with its own administrators and access policies. See [Tailscale's device visibility explanation](https://tailscale.com/docs/concepts/device-visibility).
-
-The PC must stay powered, logged into an interactive desktop, and awake. Orbit Host includes an optional keep-awake checkbox, released when its window closes. This portable host is not a Windows service; it does not provide reliable access to the login screen after reboot or UAC secure desktop. Autorun, wake-on-LAN and service installation are future work. Sunshine continues running after closing the companion; `scripts/stop-host.ps1` stops this project's instance.
-
-For control of Task Manager and other elevated apps, click **Enable administrator control** on the Windows PC and approve UAC there. The approved helper restarts only this installation's Sunshine process with administrator permissions, preserving login and pairing. The companion confirms the actual process token before showing the administrator badge. Cancelling UAC leaves the running host intact. The Mac must reconnect after an approved restart. Do this before leaving the PC: the current unelevated stream cannot approve its own elevation prompt remotely.
-
-Administrator mode is remembered locally. When sharing is stopped, **Start PC sharing** requests Windows approval again in that mode. Opening Orbit never automatically opens a UAC prompt; it leaves administrator sharing stopped until you click Start. The companion itself continues to run with standard permissions. A persistent service that needs only one installation approval is future work. Administrator mode here does not imply SYSTEM, kernel privileges, or guaranteed control of UAC's secure desktop.
-
-Click **Allow connections** when prompted by Orbit Host and approve Windows' administrator prompt to add the inbound firewall rules. The app verifies the active rules before advancing. **More options → Check access** checks permission again. You can also run `scripts/enable-firewall.ps1` in an administrator PowerShell. It scopes streaming ports to your local subnet and Tailscale address range and leaves the admin port unopened. No firewall settings are changed by the normal launcher. Run the companion from the project folder so it can find its runtime and setup scripts.
-
-## Displays and limitations
-
-Orbit's current interface focuses on one host display. No display-switch shortcut is needed for normal use. Sunshine captures the primary display unless its local configuration specifies another output. 120 fps requires suitable host and client display modes, hardware decode, and sufficient network bandwidth. There is no zero-latency guarantee.
-
-If video freezes or turns black while mouse input still reaches the PC, close the stream and reconnect with **Performance → Stable · 60 fps**. If it persists, collect the statistics overlay and Mac client log to distinguish capture, delivery, decoding and rendering failures. `scripts/tune-host.ps1 -Restart` can cap this portable host at 12 Mbps and request a 120 fps minimum capture target. It backs up the previous local configuration before changing it; restarting disconnects an active stream. Credentials and pairing are preserved. The cap can reduce image quality and is an optional troubleshooting setting.
-
-The client still includes Moonlight's mature app grid and advanced settings; the connection screen, cards, toolbar, pairing dialogs, and default profile are customized for Orbit. Access credentials use the upstream engine's certificate store, not a newly implemented macOS Keychain integration.
-
-## Build
+## Build & Verify
 
 ```powershell
-git clone --recurse-submodules https://github.com/aaronbiscotti/orbit-remote.git
-cd orbit-remote
 dotnet run --project tests/Orbit.Tests -c Release
 dotnet publish host/Orbit.Host -c Release -r win-x64 --self-contained true -o dist/Orbit-Host
 ./scripts/setup-host.ps1
 ./scripts/start-host.ps1
 ```
 
-Requires .NET SDK 8 for building; the published Windows host includes its runtime. Portable Sunshine is pinned to `v2026.914.233613` and its download is checked against GitHub's SHA-256 digest. On Windows, runtime/profile files stay under ignored `runtime/`. The profile directory is restricted to the current user, SYSTEM and administrators. Existing settings are preserved on rerun. Admin passwords are not persisted by Orbit, and TLS validates the exact certificate from this project's local Sunshine profile. Both LAN and WAN streams require encryption.
+Client builds require Qt 6 (`QtCore`, `QtGui`, `QtNetwork`, `QtQml`, `QtQuick`, `QtQuickControls2`) and Python 3:
+- Verify client sources: `python scripts/apply-client.py --check`
+- Build Windows client: `./scripts/build-client-windows.ps1`
+- Build Universal macOS client (`Orbit.app`): `bash scripts/build-client-mac.sh`
 
-Client builds require Qt 6.11.2, Python 3, recursive submodules and the upstream build prerequisites. Apply `python scripts/apply-client.py`, then run `scripts/build-client-windows.ps1` from an MSVC developer shell, or `bash scripts/build-client-mac.sh` on macOS. GitHub Actions builds all three packages. The Moonlight submodule is pinned to `a57e947d7185fd01384f6973df4df59ae2968d01`; overlays are deterministic and checked with `python scripts/apply-client.py --check`.
-
-The client intentionally stays in its pinned, modified submodule locally. All modifications are reproduced from tracked overlays; the parent Git status will show `vendor/moonlight` as modified. Use `git submodule update --init --recursive` after cloning, then apply the overlay. Do not commit host profiles, client certificates, logs, or generated binaries.
-
-GPL-3.0; see [NOTICE](NOTICE) and [LICENSE](LICENSE). This project builds on Sunshine and Moonlight and preserves their notices.
+GPL-3.0; see [NOTICE](NOTICE) and [LICENSE](LICENSE).

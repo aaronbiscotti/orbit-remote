@@ -23,21 +23,22 @@ public partial class MainWindow : Window
     private SunshineApi? api;
     private bool refreshing, pairing, loggingIn, checkingAccess, enablingAccess;
     private bool accessAllowed, configured, paired, connectingAnother;
-    private bool hostRunning, administratorControl, enablingAdministrator;
-    private int pendingCount;
+    private bool hostRunning, administratorControl, systemControl, enablingAdministrator;
+    private int pendingCount, activeSessions;
     public MainWindow()
     {
         InitializeComponent();
         root = FindRoot();
         ComputerName.Text = Environment.MachineName;
         try {
+            EnsureRuntimePrepared();
             configured = HasAdminLogin();
             if (configured) {
                 using var document = JsonDocument.Parse(File.ReadAllText(StateFile));
                 Username.Text = document.RootElement.GetProperty("username").GetString() ?? "orbit";
             }
         } catch (Exception ex) { Notify(Friendly(ex)); }
-        timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         timer.Tick += async (_, _) => await Refresh();
         Loaded += async (_, _) => {
             await Refresh();
@@ -58,8 +59,57 @@ public partial class MainWindow : Window
     }
     private string Runtime => Path.Combine(root, "runtime", "sunshine", "Sunshine");
     private string Certificate => Path.Combine(Runtime, "config", "credentials", "cacert.pem");
+    private string KeyFile => Path.Combine(Runtime, "config", "credentials", "cakey.pem");
     private string StateFile => Path.Combine(Runtime, "config", "sunshine_state.json");
     private string AdministratorPreference => Path.Combine(Runtime, "config", "administrator-control.enabled");
+
+    private void EnsureRuntimePrepared()
+    {
+        var configDir = Path.Combine(Runtime, "config");
+        var credDir = Path.Combine(configDir, "credentials");
+        Directory.CreateDirectory(credDir);
+        var configFile = Path.Combine(configDir, "sunshine.conf");
+        if (!File.Exists(configFile))
+        {
+            File.WriteAllLines(configFile, new[]
+            {
+                $"sunshine_name = {Environment.MachineName}",
+                "engine = orbit-takeover",
+                "takeover_port = 47995",
+                "admin_port = 47990"
+            });
+        }
+        if (!File.Exists(Certificate) || !File.Exists(KeyFile))
+        {
+            using var cert = TakeoverServer.EnsureCertificate(Certificate, KeyFile);
+        }
+        var agentExe = Path.Combine(Runtime, "sunshine.exe");
+        var currentExe = Environment.ProcessPath;
+        if (!File.Exists(agentExe) && !string.IsNullOrEmpty(currentExe) && File.Exists(currentExe))
+        {
+            var srcDir = Path.GetDirectoryName(currentExe)!;
+            foreach (var file in Directory.GetFiles(srcDir))
+            {
+                var dest = Path.Combine(Runtime, Path.GetFileName(file));
+                if (!File.Exists(dest))
+                {
+                    try { File.Copy(file, dest, overwrite: false); } catch { }
+                }
+            }
+            try { File.Copy(currentExe, agentExe, overwrite: true); } catch { }
+            var runtimeConfig = Path.Combine(srcDir, "Orbit.Host.runtimeconfig.json");
+            if (File.Exists(runtimeConfig))
+            {
+                try { File.Copy(runtimeConfig, Path.Combine(Runtime, "sunshine.runtimeconfig.json"), overwrite: true); } catch { }
+            }
+            var depsJson = Path.Combine(srcDir, "Orbit.Host.deps.json");
+            if (File.Exists(depsJson))
+            {
+                try { File.Copy(depsJson, Path.Combine(Runtime, "sunshine.deps.json"), overwrite: true); } catch { }
+            }
+        }
+    }
+
     private bool HasAdminLogin()
     {
         if (!File.Exists(StateFile)) return false;
@@ -101,10 +151,18 @@ public partial class MainWindow : Window
         AdministratorButton.Visibility = administratorControl ? Visibility.Collapsed : Visibility.Visible;
         AdministratorButton.IsEnabled = !enablingAdministrator;
         AdministratorButton.Content = enablingAdministrator ? "Waiting for Windows…" : "Enable administrator control";
-        AdministratorTitle.Text = administratorControl ? "✓ Administrator control enabled" : "Desktop control";
-        AdministratorHint.Text = administratorControl ? "Includes apps running as administrator." : enablingAdministrator
-            ? "Approve the prompt on this Windows PC, then reconnect."
-            : "To control Task Manager, enable this while at the PC.";
+        AdministratorTitle.Text = systemControl
+            ? "✓ Full OS Takeover (SYSTEM & UAC ready)"
+            : administratorControl
+                ? "✓ Administrator control enabled"
+                : "OS Takeover & UAC prompts";
+        AdministratorHint.Text = systemControl
+            ? "Includes UAC Administrator prompts, elevated apps, and Windows Lock Screen."
+            : administratorControl
+                ? "Includes apps running as administrator and UAC prompts."
+                : enablingAdministrator
+                    ? "Approve the prompt on this Windows PC, then reconnect."
+                    : "To see UAC prompts and control elevated apps from your Mac, enable this once while at the PC.";
     }
     private void UpdateCredentialsButton()
     {
@@ -131,12 +189,24 @@ public partial class MainWindow : Window
             WaitingHint.Text = tail != null ? "Waiting for your Mac…" : "For access while away, connect Tailscale on both devices.";
             var processes = WindowsHostProcess.Find(Path.Combine(Runtime, "sunshine.exe"));
             hostRunning = processes.Count > 0;
-            administratorControl = processes.Count == 1 && processes[0].Elevated == true;
+            administratorControl = processes.Count >= 1 && processes.All(p => p.Elevated == true);
+            systemControl = processes.Count >= 1 && processes.Any(p => p.IsSystem);
             configured = HasAdminLogin();
-            HostStatus.Text = hostRunning ? "● PC sharing is on" : "○ PC sharing is off";
+            HostStatus.Text = !hostRunning
+                ? "○ OS Takeover is off"
+                : activeSessions > 0
+                    ? $"● Mac connected ({activeSessions})"
+                    : "● OS Takeover ready";
             StartButton.Visibility = hostRunning ? Visibility.Collapsed : Visibility.Visible;
             Displays.Text = string.Join("\n", System.Windows.Forms.Screen.AllScreens.Select((s,i) => $"Display {i+1} · {s.Bounds.Width} × {s.Bounds.Height}{(s.Primary ? " · primary" : "")}"));
             if (api != null) {
+                var status = await api.GetStatus();
+                activeSessions = status.ActiveSessions;
+                if (string.Equals(status.Privilege, "SYSTEM", StringComparison.OrdinalIgnoreCase))
+                {
+                    systemControl = true;
+                    administratorControl = true;
+                }
                 var pairs = await api.PendingPairs();
                 var selected = (Pending.SelectedItem as PairRequest)?.Id;
                 Pending.ItemsSource = pairs;
@@ -163,30 +233,33 @@ public partial class MainWindow : Window
     private async Task StartStandardHost()
     {
         try {
+            EnsureRuntimePrepared();
             var exe = Path.Combine(Runtime, "sunshine.exe");
             var config = Path.Combine(Runtime, "config", "sunshine.conf");
             if (!File.Exists(exe) || !File.Exists(config)) { Notify("Host files are missing. Extract the full Windows download and open Launch Orbit."); return; }
             var info = new ProcessStartInfo(exe) { WorkingDirectory = Runtime, UseShellExecute = false, CreateNoWindow = true };
             if (WindowsHostProcess.Find(exe).Count > 0) { await Refresh(); return; }
             info.ArgumentList.Add(config); using var process = Process.Start(info);
-            Notify("Starting PC sharing…"); await Task.Delay(2500); await Refresh();
+            Notify("Starting OS Takeover host…"); await Task.Delay(1200); await Refresh();
         } catch (Exception ex) { Notify(Friendly(ex)); }
     }
     private async void EnableAdministrator(object sender, RoutedEventArgs e) => await EnableAdministratorControl();
     private async Task EnableAdministratorControl()
     {
         if (enablingAdministrator) return;
+        EnsureRuntimePrepared();
         var script = Path.Combine(root, "scripts", "start-host-admin.ps1");
         if (!File.Exists(script)) { Notify("Extract the complete updated Windows host first."); return; }
-        enablingAdministrator = true; Notify("PC sharing will restart after approval. Reconnect from your Mac."); DrawSteps();
+        enablingAdministrator = true; Notify("OS Takeover will restart with Administrator & UAC support after approval. Reconnect from your Mac."); DrawSteps();
         try {
             // Nothing is stopped until Windows has approved and started this helper.
             using var process = Process.Start(AdministratorLaunch.ForScript(script))!;
             await process.WaitForExitAsync();
-            if (process.ExitCode != 0) throw new InvalidOperationException("Administrator sharing could not start.");
+            if (process.ExitCode != 0) throw new InvalidOperationException("Administrator takeover could not start.");
             var processes = WindowsHostProcess.Find(Path.Combine(Runtime, "sunshine.exe"));
-            administratorControl = processes.Count == 1 && processes[0].Elevated == true;
-            Notify(administratorControl ? "Administrator control enabled. Reconnect from your Mac." : "Administrator permission could not be verified.");
+            administratorControl = processes.Count >= 1 && processes.All(p => p.Elevated == true);
+            systemControl = processes.Count >= 1 && processes.Any(p => p.IsSystem);
+            Notify(administratorControl ? "Administrator & UAC takeover enabled. Reconnect from your Mac." : "Administrator permission could not be verified.");
         } catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) {
             Notify("Approval cancelled. Your current sharing process was left running.");
         } catch (Exception ex) {
@@ -198,7 +271,7 @@ public partial class MainWindow : Window
             } else Notify(Friendly(ex));
         } finally { enablingAdministrator = false; await Refresh(); }
     }
-    private void OpenSettings(object sender, RoutedEventArgs e) => Open("https://127.0.0.1:47990");
+    private void OpenSettings(object sender, RoutedEventArgs e) => Open("https://127.0.0.1:47990/api/config");
     private void OpenTailscale(object sender, RoutedEventArgs e) => Open("https://tailscale.com/download");
     private void GetMacApp(object sender, RoutedEventArgs e) => Open("https://github.com/aaronbiscotti/orbit-remote/releases/latest");
     private static void Open(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
@@ -222,6 +295,7 @@ public partial class MainWindow : Window
     private async void CheckAccess(object sender, RoutedEventArgs e) { Notify(""); await CheckFirewall(); }
     private async void EnableConnections(object sender, RoutedEventArgs e)
     {
+        EnsureRuntimePrepared();
         var script = Path.Combine(root, "scripts", "enable-firewall.ps1");
         if (!File.Exists(script)) { Notify("Extract the full Windows download first."); return; }
         enablingAccess = true; Notify(""); DrawSteps();
@@ -246,6 +320,7 @@ public partial class MainWindow : Window
     {
         loggingIn = true; Notify(""); DrawSteps(); SunshineApi? candidate = null;
         try {
+            EnsureRuntimePrepared();
             if (!File.Exists(Certificate)) throw new InvalidOperationException("Start PC sharing first.");
             if (string.IsNullOrWhiteSpace(Username.Text) || Username.Text.Contains(':') || Password.Password.Length == 0) throw new InvalidOperationException("Enter your PC username and password.");
             candidate = new SunshineApi(Username.Text.Trim(), Password.Password, Certificate);
