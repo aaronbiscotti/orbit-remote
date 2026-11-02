@@ -37,6 +37,7 @@
       }
     ],
     "mac": {
+      "icon": "electron/assets/icon.png",
       "category": "public.app-category.utilities",
       "target": [
         {
@@ -51,6 +52,7 @@
       "identity": null
     },
     "win": {
+      "icon": "electron/assets/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -67,7 +69,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Orbit"
+      "shortcutName": "Orbit",
+      "installerIcon": "electron/assets/icon.ico",
+      "uninstallerIcon": "electron/assets/icon.ico",
+      "installerHeaderIcon": "electron/assets/icon.ico"
     }
   },
   "devDependencies": {

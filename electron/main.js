@@ -103,6 +103,60 @@ function ensureWindowsHostPrepared() {
     );
   }
 
+  const stateFile = path.join(configDir, 'sunshine_state.json');
+  const localKeyFile = path.join(configDir, 'local_admin_key.json');
+
+  // Auto-provision loopback admin credentials so the user never has to set/type a password
+  try {
+    let localCreds = null;
+    if (fs.existsSync(localKeyFile)) {
+      localCreds = JSON.parse(fs.readFileSync(localKeyFile, 'utf8'));
+    }
+    if (!localCreds || !localCreds.username || !localCreds.password) {
+      localCreds = {
+        username: 'orbit',
+        password: crypto.randomBytes(24).toString('hex')
+      };
+      fs.writeFileSync(localKeyFile, JSON.stringify(localCreds, null, 2), 'utf8');
+    }
+
+    let stateObj = { username: '', passwordSaltHex: '', passwordHashHex: '', clients: [] };
+    if (fs.existsSync(stateFile)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+        if (parsed && typeof parsed === 'object') {
+          stateObj = {
+            username: parsed.username || '',
+            passwordSaltHex: parsed.passwordSaltHex || '',
+            passwordHashHex: parsed.passwordHashHex || '',
+            clients: Array.isArray(parsed.clients) ? parsed.clients : []
+          };
+        }
+      } catch {}
+    }
+
+    const saltBuf =
+      stateObj.passwordSaltHex && stateObj.passwordSaltHex.length === 32
+        ? Buffer.from(stateObj.passwordSaltHex, 'hex')
+        : crypto.randomBytes(16);
+    const expectedHashHex = crypto
+      .pbkdf2Sync(localCreds.password, saltBuf, 100000, 32, 'sha256')
+      .toString('hex')
+      .toUpperCase();
+
+    if (
+      stateObj.username !== localCreds.username ||
+      stateObj.passwordHashHex.toUpperCase() !== expectedHashHex
+    ) {
+      stateObj.username = localCreds.username;
+      stateObj.passwordSaltHex = saltBuf.toString('hex').toUpperCase();
+      stateObj.passwordHashHex = expectedHashHex;
+      fs.writeFileSync(stateFile, JSON.stringify(stateObj, null, 2), 'utf8');
+    }
+
+    hostAdminCredentials = { username: localCreds.username, password: localCreds.password };
+  } catch {}
+
   return {
     workRoot,
     runtimeDir,
@@ -110,7 +164,7 @@ function ensureWindowsHostPrepared() {
     configFile,
     agentExe,
     certFile: path.join(credDir, 'cacert.pem'),
-    stateFile: path.join(configDir, 'sunshine_state.json'),
+    stateFile,
     adminPrefFile: path.join(configDir, 'administrator-control.enabled'),
     scriptsDir: scriptsDest
   };
@@ -651,6 +705,30 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
+  ipcMain.handle('host:enable-system-access', async () => {
+    const paths = ensureWindowsHostPrepared();
+    const fwScript = path.join(paths.scriptsDir, 'enable-firewall.ps1').replace(/'/g, "''");
+    const adminScript = path.join(paths.scriptsDir, 'start-host-admin.ps1').replace(/'/g, "''");
+    const innerCmd = `& '${fwScript}'; & '${adminScript}'`;
+    const encoded = Buffer.from(innerCmd, 'utf16le').toString('base64');
+    const outerCmd = `$p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','${encoded}'; exit $p.ExitCode`;
+
+    await new Promise((resolve, reject) => {
+      execFile(
+        'powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', outerCmd],
+        { windowsHide: true },
+        (err) => {
+          if (err) return reject(new Error('Administrator approval was cancelled or failed.'));
+          resolve(true);
+        }
+      );
+    });
+    await new Promise((r) => setTimeout(r, 1200));
+    cachedFirewallAllowed = await runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1'));
+    return { ok: true, firewallAllowed: cachedFirewallAllowed };
+  });
+
   ipcMain.handle('host:pair-mac', async (_event, { pairingId, pin, name }) => {
     const res = await adminApiRequest('POST', 'api/pin', {
       pairing_id: pairingId,
@@ -981,6 +1059,7 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: '#101218',
     title: 'Orbit',
+    icon: path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

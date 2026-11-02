@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('orbit', {
   enableFirewall: () => ipcRenderer.invoke('host:enable-firewall'),
   checkFirewall: () => ipcRenderer.invoke('host:check-firewall'),
   enableAdminTakeover: () => ipcRenderer.invoke('host:enable-admin'),
+  enableSystemAccess: () => ipcRenderer.invoke('host:enable-system-access'),
   pairMac: (pairingId, pin, name) => ipcRenderer.invoke('host:pair-mac', { pairingId, pin, name }),
   revokeClient: (uuid) => ipcRenderer.invoke('host:revoke-client', { uuid }),
   setKeepAwake: (enabled) => ipcRenderer.invoke('host:keep-awake', { enabled }),
