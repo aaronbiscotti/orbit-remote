@@ -25,6 +25,9 @@
     "directories": {
       "output": "dist/electron"
     },
+    "asarUnpack": [
+      "electron/assets/**/*"
+    ],
     "files": [
       "electron/**/*",
       "package.json",

@@ -14,6 +14,7 @@ const { ENGINE_ADMIN_PORT, ENGINE_TAKEOVER_PORT } = require('./ports');
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isWindows = process.platform === 'win32';
+if (isWindows) app.setAppUserModelId('local.orbit.remote');
 
 let mainWindow = null;
 if(!app.requestSingleInstanceLock())app.exit(0);
@@ -1226,7 +1227,7 @@ async function checkForUpdates(manual) {
     if (!found) return { commit: BUILD.commit, message: manual ? `Orbit is up to date (build ${BUILD.run}).` : '' };
     pendingUpdate = found;
     void installPendingUpdate();
-    return { commit: BUILD.commit, message: inRemoteSession() ? `Build ${found.run} is ready and installs when you disconnect.` : `Installing build ${found.run}…` };
+    return { commit: BUILD.commit, message: inRemoteSession() ? `Build ${found.run} is ready and installs when you disconnect.` : `Installing build ${found.run}â€¦` };
   } catch (error) {
     return { commit: BUILD.commit, message: manual ? `Couldn't check for updates: ${error.message}` : '' };
   } finally {
@@ -1238,7 +1239,7 @@ async function checkForUpdates(manual) {
 async function installPendingUpdate() {
   if (!pendingUpdate || updateInstalling || inRemoteSession()) return;
   updateInstalling = true;
-  sendUpdateEvent({ status: 'installing', message: `Installing Orbit build ${pendingUpdate.run}…` });
+  sendUpdateEvent({ status: 'installing', message: `Installing Orbit build ${pendingUpdate.run}â€¦` });
   try {
     if (process.platform === 'darwin') {
       await updater.installMac(pendingUpdate.file, path.resolve(process.execPath, '../../..'));
