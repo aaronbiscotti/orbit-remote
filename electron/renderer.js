@@ -22,6 +22,7 @@
   let tactileSoundsEnabled = localStorage.getItem('orbit_tactile_sounds') !== 'false';
 
   const $ = (id) => document.getElementById(id);
+  document.documentElement.classList.toggle('mac', navigator.platform.startsWith('Mac'));
 
   // ============================================================================
   // Nintendo Switch Audio-Visual Synesthesia (Synthesized Micro-Acoustics)
@@ -349,13 +350,14 @@
       const textGroup = document.createElement('div');
       const nameEl = document.createElement('div');
       nameEl.className = 'item-title';
-      nameEl.textContent = pc.name || pc.address;
+      const shownName = pc.name || pc.address;
+      nameEl.textContent = shownName;
 
       const subEl = document.createElement('div');
       subEl.className = 'item-sub';
-      subEl.textContent = pc.online
-        ? `${pc.address} · ${pc.paired ? 'Paired' : 'Ready to pair'}`
-        : `${pc.address} · Offline`;
+      const status = pc.online ? (pc.paired ? 'Paired' : 'Ready to pair') : 'Offline';
+      // Show the address under the name only when the name isn't already the address.
+      subEl.textContent = shownName === pc.address ? status : `${pc.address} · ${status}`;
 
       textGroup.appendChild(nameEl);
       textGroup.appendChild(subEl);
@@ -383,6 +385,8 @@
       delBtn.title = 'Remove PC';
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', async () => {
+        // Removing forgets the pairing and stream settings, so ask first.
+        if (!confirm(`Remove ${pc.name || pc.address}? You will need to pair it again.`)) return;
         await orbit.removePc(pc.address);
         refreshPcCards();
       });

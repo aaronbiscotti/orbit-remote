@@ -876,7 +876,7 @@ textarea {
 }
 
 .item-title {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   font-size: 13.5px;
   font-weight: 500;
@@ -888,7 +888,7 @@ textarea {
 }
 
 .item-sub {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   font-size: 12px;
   line-height: 1.15;
@@ -1251,4 +1251,12 @@ textarea {
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
+}
+
+/* macOS draws its own window buttons at the top left: start Orbit's controls after them, and hide the Windows-style ones. */
+.mac .window-titlebar {
+  padding-left: 78px;
+}
+.mac .titlebar-controls {
+  display: none;
 }

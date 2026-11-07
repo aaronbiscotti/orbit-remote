@@ -6,7 +6,7 @@ const net = require('net');
 const tls = require('tls');
 const https = require('https');
 const crypto = require('crypto');
-const { spawn, execFile } = require('child_process');
+const { spawn, execFile, execFileSync } = require('child_process');
 const { VideoSession } = require('./video-session');
 const { NativeVideoSession } = require('./native-video-session');
 
@@ -84,6 +84,11 @@ function ensureWindowsHostPrepared(force = false) {
   }
 
   if (fs.existsSync(path.join(srcEngine, 'Orbit.Host.exe')) && engineNeedsSync) {
+    // Stop this user's engine first: Windows won't overwrite files it is running, and a half-copied engine
+    // (old and new files mixed) drops every connection. The SYSTEM service runs its own copy in Program Files.
+    try {
+      execFileSync('taskkill', ['/F', '/IM', 'sunshine.exe', '/FI', `USERNAME eq ${os.userInfo().username}`], { stdio: 'ignore', windowsHide: true });
+    } catch {}
     for (const file of fs.readdirSync(srcEngine)) {
       const fullSrc = path.join(srcEngine, file);
       if (fs.statSync(fullSrc).isFile()) {
@@ -412,10 +417,10 @@ function isEngineProcessRunning() {
 
 async function startLocalWindowsEngineIfNeeded() {
   if (!isWindows) return false;
+  const paths = ensureWindowsHostPrepared(); // also replaces an engine copy left over from an older version
   const running = await isEngineProcessRunning();
   if (running) return true;
 
-  const paths = ensureWindowsHostPrepared();
   if (!paths || !fs.existsSync(paths.agentExe)) return false;
 
   try {
@@ -1044,6 +1049,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('client:disconnect', () => queueVideoOperation(async () => {
     await closeRemoteSession();
+    void installPendingUpdate();
     return { ok: true };
   }));
 
@@ -1142,7 +1148,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('app:check-updates', async () => {
-    return await checkAndApplyCodeUpdates({ manual: true, pullRemote: true });
+    return await checkForUpdates(true);
   });
 
   ipcMain.handle('window:minimize', () => {
@@ -1162,250 +1168,73 @@ function registerIpcHandlers() {
 }
 
 // ============================================================================
-// Auto-Update & Live Code Sync Engine (GitHub + Local Workspace Watch)
+// Updates: full builds that CI publishes as GitHub releases
 // ============================================================================
-const REPO_URL = 'https://github.com/aaronbiscotti/orbit-remote.git';
+const updater = require('./updater');
+// Written by CI. A packaged build without it predates this updater, so it counts as build 0 and updates.
+const BUILD = (() => { try { return require('./build-info.json'); } catch { return { run: 0, commit: 'unknown' }; } })();
+let updateChecking = false;
+let updateInstalling = false;
+let pendingUpdate = null;
 
-let updateInProgress = false;
-let fileWatcherStarted = false;
-let runtimeFileHashes = new Map();
+function sendUpdateEvent(evt) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app:update-event', evt);
+}
 
-function sha256File(filePath) {
+function inRemoteSession() {
+  return Boolean(sessionAddress || videoSession || (sessionSocket && !sessionSocket.destroyed));
+}
+
+async function checkForUpdates(manual) {
+  if (!app.isPackaged) return { message: manual ? 'Updates are off when Orbit runs from source.' : '' };
+  if (pendingUpdate) {
+    void installPendingUpdate();
+    return { commit: BUILD.commit, message: `Build ${pendingUpdate.run} is ready and installs when you disconnect.` };
+  }
+  if (updateChecking) return { commit: BUILD.commit, message: manual ? 'Already checking for updates.' : '' };
+  updateChecking = true;
   try {
-    if (!fs.existsSync(filePath)) return '';
-    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
-  } catch {
-    return '';
-  }
-}
-
-function listTrackedElectronFiles(electronDir) {
-  const results = [];
-  if (!fs.existsSync(electronDir)) return results;
-  for (const entry of fs.readdirSync(electronDir, { withFileTypes: true })) {
-    if (entry.isFile()) {
-      results.push(entry.name);
-    } else if (entry.isDirectory() && entry.name === 'assets') {
-      const assetsDir = path.join(electronDir, 'assets');
-      for (const asset of fs.readdirSync(assetsDir, { withFileTypes: true })) {
-        if (asset.isFile()) {
-          results.push(`assets/${asset.name}`);
-        }
-      }
-    }
-  }
-  return results;
-}
-
-function snapshotRunningHashes() {
-  for (const rel of listTrackedElectronFiles(__dirname)) {
-    runtimeFileHashes.set(rel, sha256File(path.join(__dirname, rel)));
-  }
-}
-
-function execCmd(bin, args, cwd, timeoutMs = 15000) {
-  return new Promise((resolve) => {
-    execFile(bin, args, { cwd, windowsHide: true, timeout: timeoutMs }, (err, stdout, stderr) => {
-      resolve({
-        ok: !err,
-        stdout: String(stdout || '').trim(),
-        stderr: String(stderr || '').trim()
-      });
-    });
-  });
-}
-
-async function resolveAndSyncCodeSource(pullRemote = false) {
-  const scratchRepo = path.join(os.homedir(), '.gemini', 'antigravity', 'scratch', 'orbit-remote');
-  const syncRepo = path.join(app.getPath('userData'), 'repo-sync');
-
-  let repoDir = null;
-  let isScratchWorkspace = false;
-
-  if (fs.existsSync(path.join(scratchRepo, 'electron', 'index.html'))) {
-    repoDir = scratchRepo;
-    isScratchWorkspace = true;
-  } else if (fs.existsSync(path.join(syncRepo, 'electron', 'index.html'))) {
-    repoDir = syncRepo;
-  }
-
-  if (pullRemote) {
-    if (!repoDir) {
-      fs.mkdirSync(path.dirname(syncRepo), { recursive: true });
-      const cloneRes = await execCmd('git', ['clone', '--depth', '1', REPO_URL, syncRepo], os.homedir(), 25000);
-      if (!cloneRes.ok) {
-        await execCmd('gh', ['repo', 'clone', 'aaronbiscotti/orbit-remote', syncRepo, '--', '--depth', '1'], os.homedir(), 25000);
-      }
-      if (fs.existsSync(path.join(syncRepo, 'electron', 'index.html'))) {
-        repoDir = syncRepo;
-      }
-    } else if (fs.existsSync(path.join(repoDir, '.git'))) {
-      await execCmd('git', ['fetch', 'origin', 'main'], repoDir, 15000);
-      if (isScratchWorkspace) {
-        const st = await execCmd('git', ['status', '--porcelain'], repoDir, 5000);
-        if (st.ok && !st.stdout) {
-          await execCmd('git', ['merge', '--ff-only', 'origin/main'], repoDir, 10000);
-        }
-      } else {
-        await execCmd('git', ['reset', '--hard', 'origin/main'], repoDir, 10000);
-      }
-    }
-  }
-
-  return repoDir;
-}
-
-async function getRepoShortCommit(repoDir) {
-  if (!repoDir || !fs.existsSync(path.join(repoDir, '.git'))) return 'local';
-  const res = await execCmd('git', ['rev-parse', '--short', 'HEAD'], repoDir, 4000);
-  return res.ok && res.stdout ? res.stdout : 'local';
-}
-
-async function checkAndApplyCodeUpdates({ manual = false, pullRemote = false } = {}) {
-  if (updateInProgress || isSmokeTest) {
-    return { updated: false, message: 'Update check already running.' };
-  }
-  updateInProgress = true;
-  try {
-    const sourceRepo = await resolveAndSyncCodeSource(pullRemote);
-    if (!sourceRepo) {
-      return { updated: false, commit: 'v1.0.0', message: 'Up to date.' };
-    }
-
-    const commit = await getRepoShortCommit(sourceRepo);
-    const srcElectronDir = path.join(sourceRepo, 'electron');
-    const sameDir = path.resolve(srcElectronDir) === path.resolve(__dirname);
-
-    let mainChanged = false;
-    let uiChanged = false;
-
-    for (const rel of listTrackedElectronFiles(srcElectronDir)) {
-      const srcFile = path.join(srcElectronDir, rel);
-      const dstFile = path.join(__dirname, rel);
-      if (!fs.existsSync(srcFile)) continue;
-
-      const srcHash = sha256File(srcFile);
-      const diskDstHash = sameDir ? '' : sha256File(dstFile);
-      const memHash = runtimeFileHashes.get(rel) || diskDstHash;
-
-      if (srcHash && (srcHash !== memHash || (!sameDir && srcHash !== diskDstHash))) {
-        if (!sameDir && srcHash !== diskDstHash) {
-          fs.mkdirSync(path.dirname(dstFile), { recursive: true });
-          fs.copyFileSync(srcFile, dstFile);
-        }
-        runtimeFileHashes.set(rel, srcHash);
-        if (rel === 'main.js' || rel === 'preload.js' || rel.endsWith('session.js') || rel === 'protocol.js') {
-          mainChanged = true;
-        } else {
-          uiChanged = true;
-        }
-      }
-    }
-
-    // Sync PowerShell helper scripts on Windows
-    if (isWindows && !sameDir) {
-      const srcScripts = path.join(sourceRepo, 'scripts');
-      if (fs.existsSync(srcScripts)) {
-        const paths = ensureWindowsHostPrepared();
-        for (const f of fs.readdirSync(srcScripts)) {
-          if (!f.endsWith('.ps1')) continue;
-          const sFile = path.join(srcScripts, f);
-          const sHash = sha256File(sFile);
-          if (paths && paths.scriptsDir) {
-            const wFile = path.join(paths.scriptsDir, f);
-            if (sha256File(wFile) !== sHash) {
-              try {
-                fs.copyFileSync(sFile, wFile);
-              } catch {}
-            }
-          }
-        }
-      }
-    }
-
-    if (mainChanged) {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('app:update-event', {
-          status: 'restarting',
-          commit,
-          message: `Updated to ${commit} · Restarting Orbit...`
-        });
-      }
-      setTimeout(() => {
-        app.relaunch();
-        app.exit(0);
-      }, 650);
-      return { updated: true, restarting: true, commit, message: `Updated to ${commit} · Restarting...` };
-    }
-
-    if (uiChanged || manual) {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        try {
-          mainWindow.setIcon(path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'));
-        } catch {}
-        try {
-          await mainWindow.webContents.session.clearCache();
-        } catch {}
-        mainWindow.webContents.reloadIgnoringCache();
-        setTimeout(() => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('app:update-event', {
-              status: 'updated',
-              commit,
-              message: uiChanged
-                ? `Auto-updated UI to latest code (${commit})`
-                : `Orbit refreshed to latest build (${commit})`
-            });
-          }
-        }, 450);
-      }
-      return {
-        updated: uiChanged,
-        commit,
-        message: uiChanged ? `Updated to latest code (${commit}).` : `Orbit refreshed (${commit}).`
-      };
-    }
-
-    return {
-      updated: false,
-      commit,
-      message: manual ? `Orbit is up to date (${commit}).` : ''
-    };
-  } catch {
-    return { updated: false, message: manual ? 'Update check completed.' : '' };
+    const token = await updater.githubToken();
+    if (!token) return { commit: BUILD.commit, message: manual ? 'Sign in to GitHub on this computer (gh auth login) to get updates.' : '' };
+    const found = await updater.downloadNewerBuild({ build: BUILD, platform: process.platform, token, dir: path.join(app.getPath('userData'), 'updates') });
+    if (!found) return { commit: BUILD.commit, message: manual ? `Orbit is up to date (build ${BUILD.run}).` : '' };
+    pendingUpdate = found;
+    void installPendingUpdate();
+    return { commit: BUILD.commit, message: inRemoteSession() ? `Build ${found.run} is ready and installs when you disconnect.` : `Installing build ${found.run}…` };
+  } catch (error) {
+    return { commit: BUILD.commit, message: manual ? `Couldn't check for updates: ${error.message}` : '' };
   } finally {
-    updateInProgress = false;
+    updateChecking = false;
   }
 }
 
-async function startAutoUpdateEngine() {
-  if (isSmokeTest) return;
-  snapshotRunningHashes();
-
-  const sourceRepo = await resolveAndSyncCodeSource(false);
-  if (sourceRepo && !fileWatcherStarted) {
-    const watchDir = path.join(sourceRepo, 'electron');
-    if (fs.existsSync(watchDir)) {
-      fileWatcherStarted = true;
-      let debounceTimer = null;
-      try {
-        fs.watch(watchDir, { recursive: true }, () => {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            checkAndApplyCodeUpdates({ manual: false, pullRemote: false });
-          }, 350);
-        });
-      } catch {}
+// Install only when no remote session is running, so an update never cuts off a stream or a transfer.
+async function installPendingUpdate() {
+  if (!pendingUpdate || updateInstalling || inRemoteSession()) return;
+  updateInstalling = true;
+  sendUpdateEvent({ status: 'installing', message: `Installing Orbit build ${pendingUpdate.run}…` });
+  try {
+    if (process.platform === 'darwin') {
+      await updater.installMac(pendingUpdate.file, path.resolve(process.execPath, '../../..'));
+      app.relaunch();
+    } else if (process.platform === 'win32') {
+      updater.installWindows(pendingUpdate.file);
+    } else {
+      throw new Error('updates are only built for Mac and Windows');
     }
+    app.exit(0);
+  } catch (error) {
+    updateInstalling = false;
+    pendingUpdate = null;
+    sendUpdateEvent({ status: 'error', message: `Update failed: ${error.message}` });
   }
+}
 
-  setTimeout(() => {
-    checkAndApplyCodeUpdates({ manual: false, pullRemote: false });
-  }, 1500);
-
-  setInterval(() => {
-    checkAndApplyCodeUpdates({ manual: false, pullRemote: true });
-  }, 120000);
+function startUpdateChecks() {
+  if (isSmokeTest || !app.isPackaged) return;
+  if (process.platform === 'darwin') updater.removeOldBundle(path.resolve(process.execPath, '../../..'));
+  setTimeout(() => void checkForUpdates(false), 10000);
+  setInterval(() => void checkForUpdates(false), 6 * 60 * 60 * 1000);
 }
 
 // ============================================================================
@@ -1419,6 +1248,8 @@ function createWindow() {
     minHeight: 480,
     frame: false,
     titleBarStyle: 'hidden',
+    // Centre the Mac's window buttons in Orbit's 44 px top bar.
+    trafficLightPosition: { x: 14, y: 16 },
     backgroundColor: '#111111',
     title: 'Orbit',
     icon: path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'),
@@ -1458,7 +1289,7 @@ app.whenReady().then(async () => {
   if (isWindows && !isSmokeTest) {
     startLocalWindowsEngineIfNeeded();
   }
-  startAutoUpdateEngine();
+  startUpdateChecks();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

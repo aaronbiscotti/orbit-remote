@@ -26,6 +26,9 @@ jobs:
         run: dotnet publish host/Orbit.Host -c Release -r win-x64 --self-contained true -o dist/Orbit-Host
       - name: Install Electron dependencies
         run: npm install
+      - name: Stamp the build number into the app
+        shell: bash
+        run: echo "{\"run\": ${{ github.run_number }}, \"commit\": \"${GITHUB_SHA::7}\"}" > electron/build-info.json
       - name: Smoke test Electron app
         run: npm run smoke
       - name: Build Windows Electron Installer (Setup.exe & ZIP)
@@ -50,6 +53,9 @@ jobs:
         run: mkdir -p dist/Orbit-Host
       - name: Install Electron dependencies
         run: npm install
+      - name: Stamp the build number into the app
+        shell: bash
+        run: echo "{\"run\": ${{ github.run_number }}, \"commit\": \"${GITHUB_SHA::7}\"}" > electron/build-info.json
       - name: Smoke test Electron app
         run: npm run smoke
       - name: Build Universal macOS Electron Installer (.dmg & .zip)
@@ -61,3 +67,30 @@ jobs:
             dist/electron/*.dmg
             dist/electron/*.zip
           if-no-files-found: error
+
+  release:
+    needs: [windows, macos]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish both builds as a release for the in-app updater
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir release
+          cp "$(ls artifacts/Orbit-macOS-Installer/*-mac.zip | head -1)" release/Orbit-mac-arm64.zip
+          cp "$(ls artifacts/Orbit-macOS-Installer/*.dmg | head -1)" release/Orbit-mac-arm64.dmg
+          cp "$(ls artifacts/Orbit-Windows-Installer/*.exe | head -1)" release/Orbit-Setup-win-x64.exe
+          cd release
+          mac_sha=$(sha256sum Orbit-mac-arm64.zip | cut -d' ' -f1)
+          win_sha=$(sha256sum Orbit-Setup-win-x64.exe | cut -d' ' -f1)
+          printf '{"run": %s, "commit": "%s", "mac": {"name": "Orbit-mac-arm64.zip", "sha256": "%s"}, "win": {"name": "Orbit-Setup-win-x64.exe", "sha256": "%s"}}\n' \
+            "${{ github.run_number }}" "${GITHUB_SHA::7}" "$mac_sha" "$win_sha" > update.json
+          gh release create "build-${{ github.run_number }}" ./* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Orbit build ${{ github.run_number }}" --notes "Built from ${GITHUB_SHA::7}."
