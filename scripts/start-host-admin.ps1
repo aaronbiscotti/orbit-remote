@@ -17,15 +17,34 @@ try {
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'SoftwareSASGeneration' -Value 3 -Type DWord -Force -ErrorAction SilentlyContinue
 } catch {}
 
-# Stop existing service and ALL running sunshine/Orbit.Host instances across the PC so ports 47990/47995 are freed
+# Stop existing service and ALL running sunshine/Orbit.Host instances across the PC so ports 47990/47995 and DLLs are freed
 $serviceName = 'OrbitHostService'
 $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if ($existingService) {
     & sc.exe stop $serviceName | Out-Null
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 600
 }
 Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 500
+Start-Sleep -Milliseconds 600
+
+# Refresh $engineRoot from authoritative packaged engine while all processes are stopped (prevents locked-DLL version mismatches)
+$authoritativeCandidates = @(
+    (Join-Path $env:LOCALAPPDATA 'Programs\Orbit\resources\engine'),
+    (Join-Path $repoRoot 'dist\Orbit-Host')
+)
+foreach ($cand in $authoritativeCandidates) {
+    if (Test-Path -LiteralPath (Join-Path $cand 'Orbit.Host.exe')) {
+        Get-ChildItem -LiteralPath $cand -File | Copy-Item -Destination $engineRoot -Force
+        Copy-Item -LiteralPath (Join-Path $cand 'Orbit.Host.exe') -Destination (Join-Path $engineRoot 'sunshine.exe') -Force
+        if (Test-Path -LiteralPath (Join-Path $cand 'Orbit.Host.runtimeconfig.json')) {
+            Copy-Item -LiteralPath (Join-Path $cand 'Orbit.Host.runtimeconfig.json') -Destination (Join-Path $engineRoot 'sunshine.runtimeconfig.json') -Force
+        }
+        if (Test-Path -LiteralPath (Join-Path $cand 'Orbit.Host.deps.json')) {
+            Copy-Item -LiteralPath (Join-Path $cand 'Orbit.Host.deps.json') -Destination (Join-Path $engineRoot 'sunshine.deps.json') -Force
+        }
+        break
+    }
+}
 
 # Run the SYSTEM service from a folder only administrators can change. The per-user copy lives under
 # %APPDATA%, which any program running as this user could rewrite to gain SYSTEM rights.
@@ -33,9 +52,18 @@ $userConfigDir = Join-Path $engineRoot 'config'
 $secureRoot = Join-Path $env:ProgramFiles 'Orbit\Engine'
 New-Item -ItemType Directory -Force -Path $secureRoot | Out-Null
 Get-ChildItem -LiteralPath $engineRoot -File | Copy-Item -Destination $secureRoot -Force
-# Settings, certificate and pairings are copied only the first time, so pairings made later through the service are kept.
+# Copy config if missing, and always keep local_admin_key.json + sunshine_state.json credentials synced
 $secureConfigDir = Join-Path $secureRoot 'config'
-if (!(Test-Path -LiteralPath $secureConfigDir)) { Copy-Item -LiteralPath $userConfigDir -Destination $secureConfigDir -Recurse }
+if (!(Test-Path -LiteralPath $secureConfigDir)) {
+    Copy-Item -LiteralPath $userConfigDir -Destination $secureConfigDir -Recurse -Force
+} else {
+    foreach ($cfgFile in @('local_admin_key.json', 'sunshine_state.json', 'sunshine.conf')) {
+        $srcCfg = Join-Path $userConfigDir $cfgFile
+        if (Test-Path -LiteralPath $srcCfg) {
+            Copy-Item -LiteralPath $srcCfg -Destination (Join-Path $secureConfigDir $cfgFile) -Force
+        }
+    }
+}
 $engineRoot = $secureRoot
 $exe = Join-Path $secureRoot 'sunshine.exe'
 $serviceExe = Join-Path $secureRoot 'Orbit.Host.exe'

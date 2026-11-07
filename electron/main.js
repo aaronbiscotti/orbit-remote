@@ -734,7 +734,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('host:enable-system-access', async () => {
-    const paths = ensureWindowsHostPrepared();
+    const paths = ensureWindowsHostPrepared(true);
     const fwScript = path.join(paths.scriptsDir, 'enable-firewall.ps1').replace(/'/g, "''");
     const adminScript = path.join(paths.scriptsDir, 'start-host-admin.ps1').replace(/'/g, "''");
     const innerCmd = `& '${fwScript}'; & '${adminScript}'`;
@@ -752,9 +752,25 @@ function registerIpcHandlers() {
         }
       );
     });
-    await new Promise((r) => setTimeout(r, 1200));
+
+    let verifiedPrivilege = 'Standard';
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await new Promise((r) => setTimeout(r, 500));
+      try {
+        const cfgRes = await adminApiRequest('GET', 'api/config');
+        const priv = cfgRes?.data?.privilege || 'Standard';
+        if (priv === 'SYSTEM' || priv === 'Administrator') {
+          verifiedPrivilege = priv;
+          break;
+        }
+      } catch {}
+    }
+
     cachedFirewallAllowed = await runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1'));
-    return { ok: true, firewallAllowed: cachedFirewallAllowed };
+    if (verifiedPrivilege !== 'SYSTEM' && verifiedPrivilege !== 'Administrator') {
+      throw new Error('Administrator service did not start in SYSTEM mode. Try clicking Enable again.');
+    }
+    return { ok: true, privilege: verifiedPrivilege, firewallAllowed: cachedFirewallAllowed };
   });
 
   ipcMain.handle('host:pair-mac', async (_event, { pairingId, pin, name }) => {

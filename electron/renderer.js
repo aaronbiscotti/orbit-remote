@@ -174,15 +174,19 @@
       const checkIcon = $('adminStatusIcon');
       const statusText = $('adminStatusText');
       const enableBtn = $('enableSystemAccessBtn');
+      const repairBtn = $('settingsRepairAdminBtn');
 
       if (isSystem) {
         checkIcon.classList.remove('hidden');
         statusText.textContent = 'Active';
         enableBtn.classList.add('hidden');
+        if (repairBtn && !repairBtn.disabled) repairBtn.textContent = 'Active · Re-apply';
       } else {
         checkIcon.classList.add('hidden');
         statusText.textContent = 'Standard';
         enableBtn.classList.remove('hidden');
+        if (!enableBtn.disabled) enableBtn.textContent = 'Enable';
+        if (repairBtn && !repairBtn.disabled) repairBtn.textContent = 'Enable';
       }
 
       // Pending pairing requests
@@ -261,18 +265,43 @@
     }, 1400);
   });
 
-  $('enableSystemAccessBtn').addEventListener('click', async () => {
+  async function applyAdminService() {
+    const enableBtn = $('enableSystemAccessBtn');
+    const repairBtn = $('settingsRepairAdminBtn');
+    const statusText = $('adminStatusText');
     try {
-      $('enableSystemAccessBtn').disabled = true;
-      $('enableSystemAccessBtn').textContent = 'Enabling...';
+      if (enableBtn) {
+        enableBtn.disabled = true;
+        enableBtn.textContent = 'Enabling...';
+      }
+      if (repairBtn) {
+        repairBtn.disabled = true;
+        repairBtn.textContent = 'Applying...';
+      }
+      if (statusText) statusText.textContent = 'Applying...';
+
       await orbit.enableSystemAccess();
-      showBanner('Administrator & UAC access enabled.');
-      await refreshHostStatus();
+      if (statusText) statusText.textContent = 'Active';
+      if (enableBtn) enableBtn.classList.add('hidden');
+      showBanner('Administrator & UAC service active (SYSTEM).');
     } catch (err) {
-      $('enableSystemAccessBtn').disabled = false;
-      $('enableSystemAccessBtn').textContent = 'Enable Admin Access';
       showBanner(err.message || 'Could not enable administrator access.');
+    } finally {
+      if (enableBtn) {
+        enableBtn.disabled = false;
+        enableBtn.textContent = 'Enable';
+      }
+      if (repairBtn) {
+        repairBtn.disabled = false;
+      }
+      await refreshHostStatus();
     }
+  }
+
+  $('enableSystemAccessBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    playTactileSound('tick');
+    applyAdminService();
   });
 
   $('hostPairBtn').addEventListener('click', async () => {
@@ -1144,22 +1173,9 @@
   });
 
   // Settings Popover: Re-apply Admin & UAC Service
-  $('settingsRepairAdminBtn')?.addEventListener('click', async () => {
+  $('settingsRepairAdminBtn')?.addEventListener('click', () => {
     playTactileSound('tick');
-    const btn = $('settingsRepairAdminBtn');
-    const prev = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Applying...';
-    try {
-      await orbit.enableSystemAccess();
-      showBanner('Administrator & UAC service verified.');
-      await refreshHostStatus();
-    } catch (err) {
-      showBanner(err.message || 'Could not re-apply service.');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = prev;
-    }
+    applyAdminService();
   });
 
   // Settings Popover: Check Updates Button
