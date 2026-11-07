@@ -24,6 +24,7 @@ if ($existingService) {
     & sc.exe stop $serviceName | Out-Null
     Start-Sleep -Milliseconds 600
 }
+<<<<<<< Updated upstream
 Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 600
 
@@ -45,6 +46,12 @@ foreach ($cand in $authoritativeCandidates) {
         break
     }
 }
+=======
+# Only Orbit's own engine copies: the real Sunshine, which Moonlight needs, is also called sunshine.exe.
+$orbitDirs = @($engineRoot, (Join-Path $env:ProgramFiles 'Orbit\Engine')) | ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd('\') + '\' }
+Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Where-Object { $p = $_.Path; $p -and ($orbitDirs | Where-Object { $p.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }) } | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+>>>>>>> Stashed changes
 
 # Run the SYSTEM service from a folder only administrators can change. The per-user copy lives under
 # %APPDATA%, which any program running as this user could rewrite to gain SYSTEM rights.
@@ -81,7 +88,7 @@ if (!$existingService) {
 Start-Sleep -Milliseconds 1500
 
 # Verify if the SYSTEM service spawned the console session agent; if not, start elevated administrator agent directly
-$runningAfterService = @(Get-Process -Name sunshine -ErrorAction SilentlyContinue)
+$runningAfterService = @(Get-Process -Name sunshine -ErrorAction SilentlyContinue | Where-Object { $_.Path -and [string]::Equals([IO.Path]::GetFullPath($_.Path), [IO.Path]::GetFullPath($exe), [StringComparison]::OrdinalIgnoreCase) })
 if ($runningAfterService.Count -eq 0) {
     $orbitStarted = Start-Process -FilePath $exe -ArgumentList ('"' + $config + '"') -WorkingDirectory $engineRoot -WindowStyle Hidden -PassThru
     try {

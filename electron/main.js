@@ -87,7 +87,9 @@ function ensureWindowsHostPrepared(force = false) {
     // Stop this user's engine first: Windows won't overwrite files it is running, and a half-copied engine
     // (old and new files mixed) drops every connection. The SYSTEM service runs its own copy in Program Files.
     try {
-      execFileSync('taskkill', ['/F', '/IM', 'sunshine.exe', '/FI', `USERNAME eq ${os.userInfo().username}`], { stdio: 'ignore', windowsHide: true });
+      // Match by folder: the real Sunshine, which Moonlight needs, is also called sunshine.exe.
+      const stopOwnCopy = `Get-Process sunshine -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '${runtimeDir.replace(/'/g, "''")}\\*' } | Stop-Process -Force`;
+      execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', stopOwnCopy], { stdio: 'ignore', windowsHide: true, timeout: 20000 });
     } catch {}
     for (const file of fs.readdirSync(srcEngine)) {
       const fullSrc = path.join(srcEngine, file);
