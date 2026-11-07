@@ -731,6 +731,16 @@ textarea {
   color: var(--fg);
 }
 
+.row-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+  margin-right: 9px;
+}
+
+.icon-pill-btn {
+  gap: 6px;
+}
+
 .setting-right {
   display: inline-flex;
   align-items: center;

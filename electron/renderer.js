@@ -249,11 +249,14 @@
     const ip = $('hostPrimaryIp').textContent;
     await orbit.copyText(ip);
     const btn = $('copyPrimaryIpBtn');
+    const label = $('copyPrimaryIpText');
     btn.classList.add('pop-success');
-    btn.textContent = 'Copied ✓';
+    if (label) label.textContent = 'Copied';
+    else btn.textContent = 'Copied';
     setTimeout(() => {
       btn.classList.remove('pop-success');
-      btn.textContent = 'Copy';
+      if (label) label.textContent = 'Copy';
+      else btn.textContent = 'Copy';
     }, 1400);
   });
 

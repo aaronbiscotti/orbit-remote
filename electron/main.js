@@ -1338,20 +1338,32 @@ async function checkAndApplyCodeUpdates({ manual = false, pullRemote = false } =
       return { updated: true, restarting: true, commit, message: `Updated to ${commit} · Restarting...` };
     }
 
-    if (uiChanged) {
+    if (uiChanged || manual) {
       if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+          mainWindow.setIcon(path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'));
+        } catch {}
+        try {
+          await mainWindow.webContents.session.clearCache();
+        } catch {}
         mainWindow.webContents.reloadIgnoringCache();
         setTimeout(() => {
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('app:update-event', {
               status: 'updated',
               commit,
-              message: `Auto-updated UI to latest code (${commit})`
+              message: uiChanged
+                ? `Auto-updated UI to latest code (${commit})`
+                : `Orbit refreshed to latest build (${commit})`
             });
           }
         }, 450);
       }
-      return { updated: true, commit, message: `Updated to latest code (${commit}).` };
+      return {
+        updated: uiChanged,
+        commit,
+        message: uiChanged ? `Updated to latest code (${commit}).` : `Orbit refreshed (${commit}).`
+      };
     }
 
     return {
