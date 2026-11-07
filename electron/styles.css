@@ -8,8 +8,10 @@
   --fg: #f2f2f2;
   --muted: #8a8a8a;
   --subtle: #666666;
-  --accent: #d97706;
-  --accent-hover: #ea8612;
+  --accent: #0082fb;
+  --accent-hover: #1b92ff;
+  --accent-gradient: linear-gradient(135deg, #0082fb 0%, #0064e0 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #1b92ff 0%, #0072ff 100%);
   --emerald: #22c55e;
   --radius-card: 14px;
   --radius-pill: 999px;
@@ -254,7 +256,7 @@ textarea {
 
 .section-action.active-wait,
 .field-hint.active-wait {
-  color: #f59e0b;
+  color: #3897ff;
   font-weight: 500;
 }
 
@@ -399,7 +401,7 @@ textarea {
   height: 30px;
   padding: 0 15px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--accent-gradient);
   border: none;
   color: #ffffff;
   font-size: 12.5px;
@@ -408,11 +410,11 @@ textarea {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background-color 0.12s ease;
+  transition: filter 0.12s ease, opacity 0.12s ease;
 }
 
 .accent-pill-btn:hover {
-  background: var(--accent-hover);
+  background: var(--accent-gradient-hover);
 }
 
 .accent-pill-btn:disabled {
@@ -523,7 +525,7 @@ textarea {
 }
 
 .sh-switch input:checked + .sh-switch-slider {
-  background-color: var(--accent);
+  background: var(--accent-gradient);
 }
 
 .sh-switch input:checked + .sh-switch-slider::before {
@@ -623,7 +625,7 @@ textarea {
 }
 
 .sh-btn-primary {
-  background: var(--accent);
+  background: var(--accent-gradient);
   color: #ffffff;
 }
 
@@ -690,8 +692,8 @@ textarea {
   font-weight: 500;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
-  background: rgba(217, 119, 6, 0.18);
-  color: #fbbf24;
+  background: rgba(0, 130, 251, 0.18);
+  color: #3897ff;
 }
 
 .sh-select {
