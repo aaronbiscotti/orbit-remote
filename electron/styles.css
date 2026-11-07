@@ -17,6 +17,10 @@
   --radius-pill: 999px;
   --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", "Consolas", monospace;
+  /* Apple Fluid Interfaces + Nintendo Switch + Emil Kowalski asymmetric physics */
+  --spring-bounce: cubic-bezier(0.22, 1.38, 0.36, 1);
+  --spring-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --press-curve: cubic-bezier(0.2, 0, 0, 1);
 }
 
 * {
@@ -106,12 +110,171 @@ textarea {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    transform 300ms var(--spring-bounce),
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
 }
 
 .circle-icon-btn:hover {
   background: var(--pill);
   color: var(--fg);
+}
+
+.circle-icon-btn:active {
+  transform: scale(0.91);
+  transition-duration: 55ms;
+  transition-timing-function: var(--press-curve);
+}
+
+.circle-icon-btn .gear-svg {
+  transition: transform 420ms var(--spring-bounce);
+}
+
+.circle-icon-btn.is-open {
+  background: var(--pill);
+  border-color: #383838;
+  color: var(--fg);
+}
+
+.circle-icon-btn.is-open .gear-svg {
+  transform: rotate(75deg);
+}
+
+/* ============================================================================
+   Top-Left Settings Popover Sheet (Spring Physics)
+   ============================================================================ */
+.settings-backdrop {
+  position: fixed;
+  inset: 44px 0 0 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.25);
+  animation: fadeBackdrop 160ms ease out;
+}
+
+@keyframes fadeBackdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.settings-popover {
+  position: fixed;
+  top: 46px;
+  left: 14px;
+  width: 288px;
+  padding: 14px 16px;
+  z-index: 70;
+  background: #1b1b1b;
+  border: 1px solid #2e2e2e;
+  border-radius: 16px;
+  transform-origin: top left;
+  animation: popoverSpringIn 240ms var(--spring-bounce) both;
+}
+
+@keyframes popoverSpringIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.popover-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fg);
+}
+
+.popover-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #252525;
+  color: var(--muted);
+}
+
+.popover-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popover-label {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.segmented-pills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  background: #131313;
+  border: 1px solid #252525;
+  border-radius: 10px;
+}
+
+.seg-btn {
+  height: 27px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 260ms var(--spring-bounce),
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.seg-btn:hover {
+  color: var(--fg);
+}
+
+.seg-btn:active {
+  transform: scale(0.95);
+  transition-duration: 55ms;
+  transition-timing-function: var(--press-curve);
+}
+
+.seg-btn.active {
+  background: var(--accent-gradient);
+  color: #ffffff;
+}
+
+.popover-divider {
+  height: 1px;
+  background: #262626;
+  margin: 12px 0 6px;
+}
+
+.popover-rows {
+  display: flex;
+  flex-direction: column;
 }
 
 .win-ctrl-btn {
@@ -180,12 +343,29 @@ textarea {
 }
 
 .pill-tabs {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
+.pill-glider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background: var(--pill);
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 340ms var(--spring-bounce),
+    width 340ms var(--spring-bounce);
+}
+
 .pill-tab {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -199,7 +379,10 @@ textarea {
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    transform 280ms var(--spring-bounce),
+    background-color 140ms ease,
+    color 140ms ease;
   white-space: nowrap;
 }
 
@@ -207,9 +390,19 @@ textarea {
   color: var(--fg);
 }
 
+.pill-tab:active {
+  transform: scale(0.95);
+  transition-duration: 55ms;
+  transition-timing-function: var(--press-curve);
+}
+
 .pill-tab.active {
   background: var(--pill);
   color: var(--fg);
+}
+
+.pill-tabs.has-glider .pill-tab.active {
+  background: transparent;
 }
 
 /* ============================================================================
@@ -225,6 +418,19 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  animation: sectionCascade 280ms var(--spring-snappy) both;
+  animation-delay: calc(var(--i, 0) * 32ms);
+}
+
+@keyframes sectionCascade {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .section-head {
@@ -335,6 +541,13 @@ textarea {
   align-items: center;
   gap: 10px;
   padding: 0 8px 0 14px;
+  transition:
+    border-color 180ms ease,
+    transform 240ms var(--spring-snappy);
+}
+
+.input-pill-card:focus-within {
+  border-color: #363636;
 }
 
 .plus-glyph {
@@ -346,6 +559,12 @@ textarea {
   color: var(--muted);
   line-height: 1;
   flex-shrink: 0;
+  transition: transform 280ms var(--spring-bounce), color 160ms ease;
+}
+
+.input-pill-card:focus-within .plus-glyph {
+  color: var(--fg);
+  transform: rotate(90deg) scale(1.06);
 }
 
 .bare-input {
@@ -365,7 +584,7 @@ textarea {
   color: var(--subtle);
 }
 
-/* Buttons */
+/* Buttons: Asymmetric fast-press (60ms) + spring-rebound (280ms) */
 .soft-pill-btn {
   display: inline-flex;
   align-items: center;
@@ -382,11 +601,26 @@ textarea {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background-color 0.12s ease;
+  transition:
+    transform 280ms var(--spring-bounce),
+    background-color 140ms ease,
+    border-color 140ms ease;
 }
 
 .soft-pill-btn:hover {
   background: #333333;
+  border-color: #3d3d3d;
+}
+
+.soft-pill-btn:active {
+  transform: scale(0.95);
+  transition-duration: 60ms;
+  transition-timing-function: var(--press-curve);
+}
+
+.soft-pill-btn.pop-success {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #4ade80;
 }
 
 .soft-pill-btn:disabled {
@@ -410,11 +644,20 @@ textarea {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: filter 0.12s ease, opacity 0.12s ease;
+  transition:
+    transform 280ms var(--spring-bounce),
+    filter 140ms ease,
+    opacity 140ms ease;
 }
 
 .accent-pill-btn:hover {
   background: var(--accent-gradient-hover);
+}
+
+.accent-pill-btn:active {
+  transform: scale(0.94);
+  transition-duration: 60ms;
+  transition-timing-function: var(--press-curve);
 }
 
 .accent-pill-btn:disabled {
@@ -444,6 +687,26 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 0;
+}
+
+.interactive-row {
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  transition:
+    transform 260ms var(--spring-bounce),
+    background-color 140ms ease;
+}
+
+.interactive-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.interactive-row:active {
+  transform: scale(0.988);
+  transition-duration: 55ms;
+  transition-timing-function: var(--press-curve);
 }
 
 .setting-name {
@@ -509,7 +772,7 @@ textarea {
   inset: 0;
   background-color: #2b2b2b;
   border-radius: 999px;
-  transition: 0.12s ease;
+  transition: background-color 180ms ease;
 }
 
 .sh-switch-slider::before {
@@ -520,8 +783,16 @@ textarea {
   left: 3px;
   bottom: 3px;
   background-color: #9a9a9a;
-  border-radius: 50%;
-  transition: 0.12s ease;
+  border-radius: 999px;
+  transition:
+    transform 280ms var(--spring-bounce),
+    width 140ms var(--spring-snappy),
+    background-color 140ms ease;
+}
+
+/* Apple iOS "Liquid Toggle" thumb stretch on press */
+.sh-switch:active .sh-switch-slider::before {
+  width: 16.5px;
 }
 
 .sh-switch input:checked + .sh-switch-slider {
@@ -531,6 +802,10 @@ textarea {
 .sh-switch input:checked + .sh-switch-slider::before {
   transform: translateX(15px);
   background-color: #ffffff;
+}
+
+.sh-switch:active input:checked + .sh-switch-slider::before {
+  transform: translateX(11.5px);
 }
 
 /* ============================================================================
@@ -899,8 +1174,8 @@ textarea {
   bottom: 16px;
   right: 16px;
   z-index: 80;
-  background: var(--card);
-  border: 1px solid #303030;
+  background: #1d1d1d;
+  border: 1px solid #323232;
   color: var(--fg);
   padding: 9px 14px;
   border-radius: 12px;
@@ -908,6 +1183,18 @@ textarea {
   align-items: center;
   gap: 10px;
   font-size: 12.5px;
+  animation: toastSpringIn 260ms var(--spring-bounce) both;
+}
+
+@keyframes toastSpringIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .sh-dialog-backdrop {

@@ -39,8 +39,13 @@ function getWindowsWorkRoot() {
   return userRoot;
 }
 
-function ensureWindowsHostPrepared() {
+let cachedHostPaths = null;
+
+function ensureWindowsHostPrepared(force = false) {
   if (!isWindows) return null;
+  if (cachedHostPaths && !force && hostAdminCredentials) {
+    return cachedHostPaths;
+  }
   const workRoot = getWindowsWorkRoot();
   const runtimeDir = path.join(workRoot, 'runtime', 'sunshine', 'Sunshine');
   const configDir = path.join(runtimeDir, 'config');
@@ -176,7 +181,7 @@ function ensureWindowsHostPrepared() {
     hostAdminCredentials = { username: localCreds.username, password: localCreds.password };
   } catch {}
 
-  return {
+  cachedHostPaths = {
     workRoot,
     runtimeDir,
     configDir,
@@ -187,6 +192,7 @@ function ensureWindowsHostPrepared() {
     adminPrefFile: path.join(configDir, 'administrator-control.enabled'),
     scriptsDir: scriptsDest
   };
+  return cachedHostPaths;
 }
 
 function getClientConfigPath() {
@@ -246,7 +252,14 @@ function saveClientConfig(cfg) {
 // ============================================================================
 // Network & Crypto Helpers
 // ============================================================================
+let cachedNetInfo = null;
+let cachedNetInfoAt = 0;
+
 function getNetworkAddresses() {
+  const now = Date.now();
+  if (cachedNetInfo && now - cachedNetInfoAt < 15000) {
+    return cachedNetInfo;
+  }
   const interfaces = os.networkInterfaces();
   let tailscaleIp = null;
   const lanIps = [];
@@ -267,12 +280,14 @@ function getNetworkAddresses() {
       }
     }
   }
-  return {
+  cachedNetInfo = {
     hostname: os.hostname(),
     tailscaleIp,
     lanIp: lanIps[0] || null,
     primaryAddress: tailscaleIp || lanIps[0] || '127.0.0.1'
   };
+  cachedNetInfoAt = now;
+  return cachedNetInfo;
 }
 
 function computePairingCommitment(pin, certSha256Hex, clientId, tokenHashHex) {
@@ -307,6 +322,12 @@ const { writeProtocolFrame, FrameAccumulator } = require('./protocol');
 // ============================================================================
 let hostAdminCredentials = null; // { username, password }
 let cachedFirewallAllowed = false;
+let firewallCheckedOnce = false;
+const loopbackHttpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 6,
+  rejectUnauthorized: false
+});
 
 function getExpectedHostCertSha256(certFile) {
   if (!certFile || !fs.existsSync(certFile)) return null;
@@ -341,8 +362,9 @@ function adminApiRequest(method, apiPath, bodyObj = null, customCreds = null) {
         path: '/' + apiPath.replace(/^\/+/, ''),
         method,
         headers,
+        agent: loopbackHttpsAgent,
         rejectUnauthorized: false,
-        timeout: 5000
+        timeout: 2500
       },
       (res) => {
         const chunks = [];
@@ -550,17 +572,20 @@ function probeSingleComputer(entry, cfg) {
 function registerIpcHandlers() {
   ipcMain.handle('app:info', async () => {
     if (isWindows) {
-      await startLocalWindowsEngineIfNeeded();
       const paths = ensureWindowsHostPrepared();
-      if (paths) {
-        cachedFirewallAllowed = await runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1'));
+      startLocalWindowsEngineIfNeeded();
+      if (paths && !firewallCheckedOnce) {
+        firewallCheckedOnce = true;
+        runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1')).then((allowed) => {
+          cachedFirewallAllowed = allowed;
+        });
       }
     }
     return {
       platform: process.platform,
       isWindows,
       network: getNetworkAddresses(),
-      clientConfig: {qualityMode:loadClientConfig().qualityMode}
+      clientConfig: { qualityMode: loadClientConfig().qualityMode }
     };
   });
 
@@ -568,20 +593,10 @@ function registerIpcHandlers() {
   ipcMain.handle('host:get-status', async () => {
     if (!isWindows) return { supported: false };
     const paths = ensureWindowsHostPrepared();
-    const running = await startLocalWindowsEngineIfNeeded();
 
-    let configured = false;
-    let savedUsername = 'orbit';
-    if (paths && fs.existsSync(paths.stateFile)) {
-      try {
-        const st = JSON.parse(fs.readFileSync(paths.stateFile, 'utf8'));
-        if (st.username) {
-          configured = true;
-          savedUsername = st.username;
-        }
-      } catch {}
-    }
-
+    let configured = true;
+    let savedUsername = hostAdminCredentials?.username || 'orbit';
+    let running = false;
     let unlocked = false;
     let privilege = 'Standard';
     let desktop = 'Default';
@@ -589,32 +604,42 @@ function registerIpcHandlers() {
     let pendingPairs = [];
     let pairedClients = [];
 
-    if (running && hostAdminCredentials) {
+    if (hostAdminCredentials) {
       try {
-        const cfgRes = await adminApiRequest('GET', 'api/config');
+        const [cfgRes, pinRes, cliRes] = await Promise.all([
+          adminApiRequest('GET', 'api/config'),
+          adminApiRequest('GET', 'api/pin'),
+          adminApiRequest('GET', 'api/clients/list')
+        ]);
+        running = true;
         if (cfgRes.data && cfgRes.data.status) {
           unlocked = true;
           privilege = cfgRes.data.privilege || 'Standard';
           desktop = cfgRes.data.desktop || 'Default';
           activeSessions = cfgRes.data.activeSessions || 0;
         }
-        const pinRes = await adminApiRequest('GET', 'api/pin');
         if (pinRes.data && Array.isArray(pinRes.data.pairings)) {
           pendingPairs = pinRes.data.pairings;
         }
-        const cliRes = await adminApiRequest('GET', 'api/clients/list');
         if (cliRes.data && Array.isArray(cliRes.data.named_certs)) {
           pairedClients = cliRes.data.named_certs;
         }
       } catch (err) {
         if (String(err.message).includes('Unauthorized')) {
-          hostAdminCredentials = null;
+          ensureWindowsHostPrepared(true);
+        } else {
+          running = await startLocalWindowsEngineIfNeeded();
         }
       }
+    } else {
+      running = await startLocalWindowsEngineIfNeeded();
     }
 
-    if (!cachedFirewallAllowed && paths) {
-      cachedFirewallAllowed = await runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1'));
+    if (!firewallCheckedOnce && paths) {
+      firewallCheckedOnce = true;
+      runPowerShellCheck(path.join(paths.scriptsDir, 'check-firewall.ps1')).then((allowed) => {
+        cachedFirewallAllowed = allowed;
+      });
     }
 
     return {
@@ -1363,12 +1388,12 @@ async function startAutoUpdateEngine() {
   }
 
   setTimeout(() => {
-    checkAndApplyCodeUpdates({ manual: false, pullRemote: true });
-  }, 2000);
+    checkAndApplyCodeUpdates({ manual: false, pullRemote: false });
+  }, 1500);
 
   setInterval(() => {
     checkAndApplyCodeUpdates({ manual: false, pullRemote: true });
-  }, 45000);
+  }, 120000);
 }
 
 // ============================================================================
@@ -1398,6 +1423,10 @@ function createWindow() {
   if (isSmokeTest) {
     mainWindow.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
+        if (process.argv.includes('--open-settings')) {
+          await mainWindow.webContents.executeJavaScript('document.getElementById("checkUpdatesCircleBtn")?.click()');
+          await new Promise((r) => setTimeout(r, 320));
+        }
         const snapArg = process.argv.find((a) => a.startsWith('--capture-ui='));
         if (snapArg) {
           const outPath = snapArg.slice('--capture-ui='.length);
@@ -1406,17 +1435,17 @@ function createWindow() {
         }
         console.log('PASS: Orbit Electron app loaded and verified.');
         app.exit(0);
-      }, 1400);
+      }, 1000);
     });
   }
 }
 
 app.whenReady().then(async () => {
   registerIpcHandlers();
-  if (isWindows && !isSmokeTest) {
-    await startLocalWindowsEngineIfNeeded();
-  }
   createWindow();
+  if (isWindows && !isSmokeTest) {
+    startLocalWindowsEngineIfNeeded();
+  }
   startAutoUpdateEngine();
 
   app.on('activate', () => {

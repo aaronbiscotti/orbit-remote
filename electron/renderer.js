@@ -16,9 +16,73 @@
   let currentFileParentPath = '';
   let currentFilePath = '';
   let pendingPairingsList = [];
+  let lastPairedSignature = null;
   let toastTimeout = null;
+  let audioCtx = null;
+  let tactileSoundsEnabled = localStorage.getItem('orbit_tactile_sounds') !== 'false';
 
   const $ = (id) => document.getElementById(id);
+
+  // ============================================================================
+  // Nintendo Switch Audio-Visual Synesthesia (Synthesized Micro-Acoustics)
+  // ============================================================================
+  function playTactileSound(kind = 'tick') {
+    if (!tactileSoundsEnabled) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (kind === 'tab') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, now);
+        osc.frequency.exponentialRampToValueAtTime(840, now + 0.018);
+        gain.gain.setValueAtTime(0.032, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.022);
+        osc.start(now);
+        osc.stop(now + 0.024);
+      } else if (kind === 'switch-on') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.024);
+        gain.gain.setValueAtTime(0.035, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.028);
+        osc.start(now);
+        osc.stop(now + 0.03);
+      } else if (kind === 'switch-off') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(720, now);
+        osc.frequency.exponentialRampToValueAtTime(420, now + 0.022);
+        gain.gain.setValueAtTime(0.03, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.026);
+        osc.start(now);
+        osc.stop(now + 0.028);
+      } else if (kind === 'pop') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(640, now);
+        osc.frequency.exponentialRampToValueAtTime(980, now + 0.032);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.exponentialRampToValueAtTime(190, now + 0.012);
+        gain.gain.setValueAtTime(0.028, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.014);
+        osc.start(now);
+        osc.stop(now + 0.016);
+      }
+    } catch {}
+  }
 
   const canvas = $('desktopCanvas');
   const ctx = canvas.getContext('2d', {
@@ -41,12 +105,33 @@
   });
 
   // ============================================================================
-  // Mode Switching (This PC vs Remote PCs)
+  // Mode Switching (This PC vs Remote PCs) + Sliding Spring Glider
   // ============================================================================
-  function setMode(mode) {
+  function syncTabGlider() {
+    const tabsEl = $('homeTabs');
+    const glider = $('homeTabGlider');
+    if (!tabsEl || !glider) return;
+    const activeBtn = modeHostVisibleAndActive();
+    if (!activeBtn || activeBtn.offsetWidth === 0) return;
+    tabsEl.classList.add('has-glider');
+    glider.style.width = `${activeBtn.offsetWidth}px`;
+    glider.style.transform = `translateX(${activeBtn.offsetLeft}px)`;
+  }
+
+  function modeHostVisibleAndActive() {
+    return currentMode === 'host' && !$('modeHostBtn').classList.contains('hidden')
+      ? $('modeHostBtn')
+      : $('modeClientBtn');
+  }
+
+  function setMode(mode, userInitiated = false) {
+    if (userInitiated && mode !== currentMode) {
+      playTactileSound('tab');
+    }
     currentMode = mode;
     $('modeHostBtn').classList.toggle('active', mode === 'host');
     $('modeClientBtn').classList.toggle('active', mode === 'client');
+    requestAnimationFrame(syncTabGlider);
 
     $('hostView').classList.toggle('hidden', mode !== 'host');
     $('clientHomeView').classList.toggle('hidden', mode !== 'client');
@@ -58,8 +143,9 @@
     }
   }
 
-  $('modeHostBtn').addEventListener('click', () => setMode('host'));
-  $('modeClientBtn').addEventListener('click', () => setMode('client'));
+  $('modeHostBtn').addEventListener('click', () => setMode('host', true));
+  $('modeClientBtn').addEventListener('click', () => setMode('client', true));
+  window.addEventListener('resize', syncTabGlider);
 
   // ============================================================================
   // This PC (Windows Host)
@@ -110,57 +196,65 @@
         hint.className = 'field-hint';
       }
 
-      // Paired devices list
+      // Paired devices list (only rebuild DOM when signature changes)
       const paired = st.pairedClients || [];
-      const section = $('pairedDevicesSection');
-      const listEl = $('pairedClientsList');
-      listEl.innerHTML = '';
-      if (paired.length === 0) {
-        section.classList.add('hidden');
-      } else {
-        section.classList.remove('hidden');
-        for (const item of paired) {
-          const row = document.createElement('div');
-          row.className = 'paired-item';
+      const nextSig = JSON.stringify(paired.map((p) => `${p.uuid}:${p.name}`));
+      if (nextSig !== lastPairedSignature) {
+        lastPairedSignature = nextSig;
+        const section = $('pairedDevicesSection');
+        const listEl = $('pairedClientsList');
+        listEl.innerHTML = '';
+        if (paired.length === 0) {
+          section.classList.add('hidden');
+        } else {
+          section.classList.remove('hidden');
+          for (const item of paired) {
+            const row = document.createElement('div');
+            row.className = 'paired-item';
 
-          const left = document.createElement('div');
-          left.className = 'item-left';
+            const left = document.createElement('div');
+            left.className = 'item-left';
 
-          const d = document.createElement('span');
-          d.className = 'dot online';
+            const d = document.createElement('span');
+            d.className = 'dot online';
 
-          const nameSpan = document.createElement('span');
-          nameSpan.className = 'item-title';
-          nameSpan.textContent = item.name || 'Mac';
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'item-title';
+            nameSpan.textContent = item.name || 'Mac';
 
-          left.appendChild(d);
-          left.appendChild(nameSpan);
+            left.appendChild(d);
+            left.appendChild(nameSpan);
 
-          const btn = document.createElement('button');
-          btn.className = 'sh-btn sh-btn-ghost sh-btn-sm';
-          btn.textContent = 'Remove';
-          btn.addEventListener('click', async () => {
-            await orbit.revokeClient(item.uuid);
-            refreshHostStatus();
-          });
+            const btn = document.createElement('button');
+            btn.className = 'sh-btn sh-btn-ghost sh-btn-sm';
+            btn.textContent = 'Remove';
+            btn.addEventListener('click', async () => {
+              playTactileSound('tick');
+              await orbit.revokeClient(item.uuid);
+              lastPairedSignature = null;
+              refreshHostStatus();
+            });
 
-          row.appendChild(left);
-          row.appendChild(btn);
-          listEl.appendChild(row);
+            row.appendChild(left);
+            row.appendChild(btn);
+            listEl.appendChild(row);
+          }
         }
       }
     } catch {}
   }
 
   $('copyPrimaryIpBtn').addEventListener('click', async () => {
+    playTactileSound('pop');
     const ip = $('hostPrimaryIp').textContent;
     await orbit.copyText(ip);
     const btn = $('copyPrimaryIpBtn');
-    const prev = btn.textContent;
+    btn.classList.add('pop-success');
     btn.textContent = 'Copied ✓';
     setTimeout(() => {
-      btn.textContent = prev;
-    }, 1500);
+      btn.classList.remove('pop-success');
+      btn.textContent = 'Copy';
+    }, 1400);
   });
 
   $('enableSystemAccessBtn').addEventListener('click', async () => {
@@ -202,7 +296,25 @@
   });
 
   $('keepAwakeToggle').addEventListener('change', (e) => {
-    orbit.setKeepAwake(e.target.checked);
+    const checked = e.target.checked;
+    playTactileSound(checked ? 'switch-on' : 'switch-off');
+    if ($('settingsKeepAwakeToggle')) $('settingsKeepAwakeToggle').checked = checked;
+    orbit.setKeepAwake(checked);
+  });
+
+  $('adminRowItem')?.addEventListener('click', (e) => {
+    if (e.target.closest('#enableSystemAccessBtn')) return;
+    playTactileSound('tick');
+    if (!$('enableSystemAccessBtn').classList.contains('hidden')) {
+      $('enableSystemAccessBtn').click();
+    } else {
+      showBanner('Administrator & UAC service is active (SYSTEM).');
+    }
+  });
+
+  $('updatesRowItem')?.addEventListener('click', () => {
+    playTactileSound('tick');
+    $('checkUpdatesBtn').click();
   });
 
   // ============================================================================
@@ -953,22 +1065,118 @@
   });
 
   // ============================================================================
-  // Frameless Window & Auto-Update Controls
+  // Frameless Window, Settings Popover & Auto-Update Controls
   // ============================================================================
   $('winMinBtn')?.addEventListener('click', () => orbit.minimizeWindow?.());
   $('winMaxBtn')?.addEventListener('click', () => orbit.maximizeWindow?.());
   $('winCloseBtn')?.addEventListener('click', () => orbit.closeWindow?.());
-  $('checkUpdatesCircleBtn')?.addEventListener('click', () => $('checkUpdatesBtn')?.click());
+
+  function setSettingsOpen(open) {
+    const popover = $('settingsPopover');
+    const backdrop = $('settingsBackdrop');
+    const gearBtn = $('checkUpdatesCircleBtn');
+    if (!popover || !backdrop || !gearBtn) return;
+    popover.classList.toggle('hidden', !open);
+    backdrop.classList.toggle('hidden', !open);
+    gearBtn.classList.toggle('is-open', open);
+    gearBtn.setAttribute('aria-expanded', String(open));
+  }
+
+  $('checkUpdatesCircleBtn')?.addEventListener('click', () => {
+    const isOpen = !$('settingsPopover')?.classList.contains('hidden');
+    playTactileSound(isOpen ? 'switch-off' : 'switch-on');
+    setSettingsOpen(!isOpen);
+  });
+
+  $('settingsBackdrop')?.addEventListener('click', () => {
+    playTactileSound('tick');
+    setSettingsOpen(false);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('settingsPopover')?.classList.contains('hidden')) {
+      setSettingsOpen(false);
+    }
+  });
+
+  // Settings Popover: Stream Quality Segmented Control
+  function syncQualityButtons(mode) {
+    document.querySelectorAll('#settingsQualitySegment .seg-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.quality === mode);
+    });
+    if ($('sessionQualitySelect')) {
+      $('sessionQualitySelect').value = mode;
+    }
+  }
+
+  document.querySelectorAll('#settingsQualitySegment .seg-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const mode = btn.dataset.quality;
+      playTactileSound('tab');
+      syncQualityButtons(mode);
+      await orbit.setQualityMode(mode);
+    });
+  });
+
+  // Settings Popover: Tactile UI Sounds Toggle
+  if ($('soundEffectsToggle')) {
+    $('soundEffectsToggle').checked = tactileSoundsEnabled;
+    $('soundEffectsToggle').addEventListener('change', (e) => {
+      tactileSoundsEnabled = e.target.checked;
+      localStorage.setItem('orbit_tactile_sounds', String(tactileSoundsEnabled));
+      if (tactileSoundsEnabled) playTactileSound('switch-on');
+    });
+  }
+
+  // Settings Popover: Keep PC Awake Sync
+  $('settingsKeepAwakeToggle')?.addEventListener('change', (e) => {
+    const checked = e.target.checked;
+    playTactileSound(checked ? 'switch-on' : 'switch-off');
+    if ($('keepAwakeToggle')) $('keepAwakeToggle').checked = checked;
+    orbit.setKeepAwake(checked);
+  });
+
+  // Settings Popover: Re-apply Admin & UAC Service
+  $('settingsRepairAdminBtn')?.addEventListener('click', async () => {
+    playTactileSound('tick');
+    const btn = $('settingsRepairAdminBtn');
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Applying...';
+    try {
+      await orbit.enableSystemAccess();
+      showBanner('Administrator & UAC service verified.');
+      await refreshHostStatus();
+    } catch (err) {
+      showBanner(err.message || 'Could not re-apply service.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prev;
+    }
+  });
+
+  // Settings Popover: Check Updates Button
+  $('settingsCheckUpdatesBtn')?.addEventListener('click', () => {
+    playTactileSound('tick');
+    $('checkUpdatesBtn')?.click();
+  });
 
   $('checkUpdatesBtn').addEventListener('click', async () => {
+    playTactileSound('tick');
     const btn = $('checkUpdatesBtn');
+    const popBtn = $('settingsCheckUpdatesBtn');
     const prev = btn.textContent;
     btn.textContent = 'Checking...';
     btn.disabled = true;
+    if (popBtn) {
+      popBtn.textContent = 'Checking...';
+      popBtn.disabled = true;
+    }
     try {
       const res = await orbit.checkForUpdates();
       if (res && res.commit) {
-        $('updateVersionLabel').textContent = `Automatic · ${res.commit} ›`;
+        $('updateVersionLabel').textContent = `Automatic · ${res.commit}`;
+        if ($('settingsCommitBadge')) $('settingsCommitBadge').textContent = `v1.0 · ${res.commit}`;
       }
       if (res && res.message) {
         showBanner(res.message);
@@ -978,13 +1186,18 @@
     } finally {
       btn.textContent = prev;
       btn.disabled = false;
+      if (popBtn) {
+        popBtn.textContent = 'Check now';
+        popBtn.disabled = false;
+      }
     }
   });
 
   if (orbit.onUpdateEvent) {
     orbit.onUpdateEvent((evt) => {
       if (evt && evt.commit) {
-        $('updateVersionLabel').textContent = `Automatic · ${evt.commit} ›`;
+        $('updateVersionLabel').textContent = `Automatic · ${evt.commit}`;
+        if ($('settingsCommitBadge')) $('settingsCommitBadge').textContent = `v1.0 · ${evt.commit}`;
       }
       if (evt && evt.message) {
         showBanner(evt.message);
@@ -996,7 +1209,8 @@
   async function init() {
     const info = await orbit.getAppInfo();
     isWindows = Boolean(info.isWindows);
-    $('sessionQualitySelect').value=info.clientConfig?.qualityMode || 'balanced';
+    const qMode = info.clientConfig?.qualityMode || 'crisp';
+    syncQualityButtons(qMode);
 
     if (!isWindows) {
       $('modeHostBtn').classList.add('hidden');

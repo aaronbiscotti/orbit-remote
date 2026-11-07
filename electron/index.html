@@ -13,8 +13,8 @@
   <!-- Custom Frameless Top Window Bar -->
   <div class="window-titlebar">
     <div class="titlebar-left">
-      <button id="checkUpdatesCircleBtn" class="circle-icon-btn" title="Check for updates">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <button id="checkUpdatesCircleBtn" class="circle-icon-btn" title="Settings" aria-label="Settings" aria-expanded="false">
+        <svg class="gear-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3.5" />
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
@@ -36,6 +36,54 @@
     </div>
   </div>
 
+  <!-- Settings Popover Sheet (Top-Left Anchored, Spring Physics) -->
+  <div id="settingsBackdrop" class="settings-backdrop hidden"></div>
+  <aside id="settingsPopover" class="settings-popover soft-card hidden" aria-label="Settings">
+    <div class="popover-head">
+      <span class="popover-title">Settings</span>
+      <span id="settingsCommitBadge" class="popover-badge">v1.0 · Live</span>
+    </div>
+
+    <div class="popover-group">
+      <span class="popover-label">Stream quality</span>
+      <div id="settingsQualitySegment" class="segmented-pills">
+        <button type="button" class="seg-btn active" data-quality="crisp">Crisp</button>
+        <button type="button" class="seg-btn" data-quality="balanced">Balanced</button>
+        <button type="button" class="seg-btn" data-quality="smooth">Smooth</button>
+      </div>
+    </div>
+
+    <div class="popover-divider"></div>
+
+    <div class="popover-rows">
+      <div class="setting-row">
+        <span class="setting-name">Tactile UI sounds</span>
+        <label class="sh-switch" title="Subtle acoustic feedback on clicks and toggles">
+          <input id="soundEffectsToggle" type="checkbox" checked />
+          <span class="sh-switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-name">Keep PC awake</span>
+        <label class="sh-switch" title="Prevent Windows from sleeping while Orbit is open">
+          <input id="settingsKeepAwakeToggle" type="checkbox" checked />
+          <span class="sh-switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-name">Admin &amp; UAC service</span>
+        <button id="settingsRepairAdminBtn" type="button" class="soft-pill-btn sh-btn-sm">Re-apply</button>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-name">Software updates</span>
+        <button id="settingsCheckUpdatesBtn" type="button" class="soft-pill-btn sh-btn-sm">Check now</button>
+      </div>
+    </div>
+  </aside>
+
   <!-- Toast Notification -->
   <div id="bannerBar" class="sh-toast hidden">
     <span id="bannerText"></span>
@@ -54,6 +102,7 @@
         </div>
 
         <div id="homeTabs" class="pill-tabs">
+          <span id="homeTabGlider" class="pill-glider" aria-hidden="true"></span>
           <button id="modeHostBtn" class="pill-tab active">This PC</button>
           <button id="modeClientBtn" class="pill-tab">Remote PCs</button>
         </div>
@@ -64,7 +113,7 @@
       <!-- ================================================================= -->
       <section id="hostView" class="stack-sections">
         <!-- Section 1: Computer -->
-        <div class="section-block">
+        <div class="section-block" style="--i: 0">
           <div class="section-head">
             <span class="section-title">Computer</span>
             <span id="hostEngineStatus" class="section-action">
@@ -83,7 +132,7 @@
         </div>
 
         <!-- Section 2: Pair Device -->
-        <div class="section-block">
+        <div class="section-block" style="--i: 1">
           <div class="section-head">
             <span class="section-title">Pair device</span>
             <span id="pendingPairHint" class="section-action">4-digit PIN</span>
@@ -108,7 +157,7 @@
         </div>
 
         <!-- Section 3: Paired Devices (shown when devices exist) -->
-        <div id="pairedDevicesSection" class="section-block hidden">
+        <div id="pairedDevicesSection" class="section-block hidden" style="--i: 2">
           <div class="section-head">
             <span class="section-title">Paired devices</span>
           </div>
@@ -116,14 +165,14 @@
         </div>
 
         <!-- Section 4: Settings (Voice / Speed / Language multi-row card style) -->
-        <div class="section-block">
+        <div class="section-block" style="--i: 3">
           <div class="section-head">
             <span class="section-title">System</span>
             <button id="checkUpdatesBtn" class="section-link">Check for updates</button>
           </div>
 
           <div class="soft-card settings-card">
-            <div class="setting-row">
+            <div id="adminRowItem" class="setting-row interactive-row" role="button" tabindex="0" title="Click to verify or re-apply Administrator & UAC service">
               <span class="setting-name">Administrator &amp; UAC</span>
               <div class="setting-right">
                 <span id="adminStatusIcon" class="hidden"></span>
@@ -140,7 +189,7 @@
               </label>
             </div>
 
-            <div class="setting-row">
+            <div id="updatesRowItem" class="setting-row interactive-row" role="button" tabindex="0" title="Click to check for updates now">
               <span class="setting-name">Updates</span>
               <span id="updateVersionLabel" class="setting-val">Automatic</span>
             </div>
@@ -152,7 +201,7 @@
       <!-- TAB 2: REMOTE PCS (Connect as Client)                             -->
       <!-- ================================================================= -->
       <section id="clientHomeView" class="stack-sections hidden">
-        <div class="section-block">
+        <div class="section-block" style="--i: 0">
           <div class="section-head">
             <span class="section-title">Add computer</span>
             <button id="refreshPcsBtn" class="section-link">Refresh</button>
