@@ -19,6 +19,7 @@
   "build": {
     "appId": "local.orbit.remote",
     "productName": "Orbit",
+    "asar": false,
     "electronLanguages": [
       "en"
     ],

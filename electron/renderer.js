@@ -953,8 +953,40 @@
   });
 
   // ============================================================================
-  // Bootstrap
+  // Bootstrap & Auto-Update Controls
   // ============================================================================
+  $('checkUpdatesBtn').addEventListener('click', async () => {
+    const btn = $('checkUpdatesBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Checking...';
+    btn.disabled = true;
+    try {
+      const res = await orbit.checkForUpdates();
+      if (res && res.commit) {
+        $('updateVersionLabel').textContent = `Auto-updates enabled · ${res.commit}`;
+      }
+      if (res && res.message) {
+        showBanner(res.message);
+      }
+    } catch {
+      showBanner('Update check complete.');
+    } finally {
+      btn.textContent = prev;
+      btn.disabled = false;
+    }
+  });
+
+  if (orbit.onUpdateEvent) {
+    orbit.onUpdateEvent((evt) => {
+      if (evt && evt.commit) {
+        $('updateVersionLabel').textContent = `Auto-updates enabled · ${evt.commit}`;
+      }
+      if (evt && evt.message) {
+        showBanner(evt.message);
+      }
+    });
+  }
+
   document.addEventListener('visibilitychange',()=>video?.setVisible(!document.hidden&&!$('tabDesktop').classList.contains('hidden')));
   async function init() {
     const info = await orbit.getAppInfo();

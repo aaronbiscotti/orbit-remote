@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('orbit', {
   getAppInfo: () => ipcRenderer.invoke('app:info'),
+  checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
   copyText: (text) => ipcRenderer.invoke('app:copy-text', { text }),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', { url }),
 
@@ -67,5 +68,10 @@ contextBridge.exposeInMainWorld('orbit', {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('client:disconnected', handler);
     return () => ipcRenderer.removeListener('client:disconnected', handler);
+  },
+  onUpdateEvent: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('app:update-event', handler);
+    return () => ipcRenderer.removeListener('app:update-event', handler);
   }
 });
