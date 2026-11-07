@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('orbit', {
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
+  closeWindow: () => ipcRenderer.invoke('window:close'),
   copyText: (text) => ipcRenderer.invoke('app:copy-text', { text }),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', { url }),
 

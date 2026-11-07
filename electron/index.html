@@ -4,9 +4,38 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Orbit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Custom Frameless Top Window Bar -->
+  <div class="window-titlebar">
+    <div class="titlebar-left">
+      <button id="checkUpdatesCircleBtn" class="circle-icon-btn" title="Check for updates">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3.5" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="titlebar-drag"></div>
+
+    <div class="titlebar-controls">
+      <button id="winMinBtn" class="win-ctrl-btn" title="Minimize" aria-label="Minimize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button id="winMaxBtn" class="win-ctrl-btn" title="Maximize" aria-label="Maximize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.2" y="2.2" width="7.6" height="7.6" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button id="winCloseBtn" class="win-ctrl-btn win-close" title="Close" aria-label="Close">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="bannerBar" class="sh-toast hidden">
     <span id="bannerText"></span>
@@ -14,95 +43,103 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- HOME SHELL (Vercel / shadcn Minimal Layout)                           -->
+  <!-- HOME SHELL                                                            -->
   <!-- ===================================================================== -->
   <div id="homeShell" class="home-shell">
     <div class="home-container">
-      <!-- Aligned Header -->
-      <header class="home-header">
-        <div class="brand">
-          <svg class="vercel-mark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
-            <ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-28 12 12)" />
-          </svg>
+      <!-- Centered Hero & Pill Tabs (Activity / Library style) -->
+      <header class="hero-header">
+        <div class="hero-title-row">
           <span class="brand-name">Orbit</span>
-          <span class="header-sep"></span>
-          <span id="hostEngineStatus" class="status-inline">
-            <span id="hostStatusDot" class="dot online"></span>
-            <span id="hostStatusLabel">Ready</span>
-          </span>
         </div>
 
-        <div id="homeTabs" class="sh-tabs-list">
-          <button id="modeHostBtn" class="sh-tabs-trigger active">This PC</button>
-          <button id="modeClientBtn" class="sh-tabs-trigger">Remote PCs</button>
+        <div id="homeTabs" class="pill-tabs">
+          <button id="modeHostBtn" class="pill-tab active">This PC</button>
+          <button id="modeClientBtn" class="pill-tab">Remote PCs</button>
         </div>
       </header>
 
       <!-- ================================================================= -->
       <!-- TAB 1: THIS PC (Windows Host)                                     -->
       <!-- ================================================================= -->
-      <section id="hostView" class="stack-md">
-        <div class="sh-card">
-          <div class="card-body stack-lg">
-            <!-- Field 1: PC Address -->
-            <div class="field-group">
-              <div class="field-header">
-                <label class="field-label">Address</label>
-                <span class="field-hint">Use on your Mac to connect</span>
-              </div>
-              <div class="input-Copy-box">
-                <code id="hostPrimaryIp" class="ip-value">127.0.0.1</code>
-                <button id="copyPrimaryIpBtn" class="sh-btn sh-btn-secondary sh-btn-sm">Copy</button>
-              </div>
-            </div>
-
-            <div class="sh-divider"></div>
-
-            <!-- Field 2: Pair with 4-digit PIN -->
-            <div class="field-group">
-              <div class="field-header">
-                <label class="field-label">Pair Device</label>
-                <span id="pendingPairHint" class="field-hint">4-digit PIN from your Mac</span>
-              </div>
-              <div class="row-gap">
-                <input
-                  id="hostPinInput"
-                  type="text"
-                  maxlength="4"
-                  inputmode="numeric"
-                  class="sh-input pin-box flex-1"
-                  placeholder="0000"
-                />
-                <button id="hostPairBtn" class="sh-btn sh-btn-primary">Pair</button>
-              </div>
-            </div>
-
-            <!-- Field 3: Paired Devices -->
-            <div id="pairedDevicesSection" class="field-group hidden">
-              <div class="sh-divider mb-4"></div>
-              <div class="field-header">
-                <label class="field-label">Paired Devices</label>
-              </div>
-              <div id="pairedClientsList" class="stack-xs"></div>
-            </div>
+      <section id="hostView" class="stack-sections">
+        <!-- Section 1: Computer -->
+        <div class="section-block">
+          <div class="section-head">
+            <span class="section-title">Computer</span>
+            <span id="hostEngineStatus" class="section-action">
+              <span id="hostStatusDot" class="dot online"></span>
+              <span id="hostStatusLabel">Online</span>
+            </span>
           </div>
 
-          <!-- Clean Footer Bar -->
-          <div class="card-footer">
-            <div class="footer-status">
-              <span id="adminStatusIcon" class="admin-check">✓</span>
-              <span id="adminStatusText" class="footer-muted">Admin &amp; UAC active</span>
-              <button id="enableSystemAccessBtn" class="sh-link-btn hidden">Enable Admin</button>
+          <div class="soft-card computer-card">
+            <div class="computer-info">
+              <code id="hostPrimaryIp" class="computer-ip">127.0.0.1</code>
+              <span class="computer-sub">Enter this address in Orbit on your Mac</span>
+            </div>
+            <button id="copyPrimaryIpBtn" class="soft-pill-btn">Copy</button>
+          </div>
+        </div>
+
+        <!-- Section 2: Pair Device -->
+        <div class="section-block">
+          <div class="section-head">
+            <span class="section-title">Pair device</span>
+            <span id="pendingPairHint" class="section-action">4-digit PIN</span>
+          </div>
+
+          <div class="soft-card input-pill-card">
+            <span class="plus-glyph">+</span>
+            <input
+              id="hostPinInput"
+              type="text"
+              maxlength="4"
+              inputmode="numeric"
+              class="bare-input"
+              placeholder="Enter 4-digit PIN from your Mac"
+            />
+            <button id="hostPairBtn" class="accent-pill-btn">Pair</button>
+          </div>
+        </div>
+
+        <!-- Section 3: Paired Devices (shown when devices exist) -->
+        <div id="pairedDevicesSection" class="section-block hidden">
+          <div class="section-head">
+            <span class="section-title">Paired devices</span>
+          </div>
+          <div id="pairedClientsList" class="soft-card list-card"></div>
+        </div>
+
+        <!-- Section 4: Settings (Voice / Speed / Language multi-row card style) -->
+        <div class="section-block">
+          <div class="section-head">
+            <span class="section-title">System</span>
+            <button id="checkUpdatesBtn" class="section-link">Check for updates</button>
+          </div>
+
+          <div class="soft-card settings-card">
+            <div class="setting-row">
+              <span class="setting-name">Administrator &amp; UAC</span>
+              <div class="setting-right">
+                <span id="adminStatusIcon" class="hidden"></span>
+                <span id="adminStatusText" class="setting-val">Active</span>
+                <button id="enableSystemAccessBtn" class="setting-action-btn hidden">Enable ›</button>
+              </div>
             </div>
 
-            <label class="switch-row" title="Prevent Windows from sleeping while Orbit is open">
-              <span class="footer-muted">Keep awake</span>
-              <span class="sh-switch">
+            <div class="setting-row">
+              <span class="setting-name">Keep PC awake</span>
+              <label class="sh-switch" title="Prevent Windows from sleeping while Orbit is open">
                 <input id="keepAwakeToggle" type="checkbox" checked />
                 <span class="sh-switch-slider"></span>
-              </span>
-            </label>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <span class="setting-name">Updates</span>
+              <span id="updateVersionLabel" class="setting-val">Automatic</span>
+            </div>
           </div>
         </div>
       </section>
@@ -110,39 +147,37 @@
       <!-- ================================================================= -->
       <!-- TAB 2: REMOTE PCS (Connect as Client)                             -->
       <!-- ================================================================= -->
-      <section id="clientHomeView" class="stack-md hidden">
-        <div class="sh-card">
-          <div class="card-body stack-md">
-            <div class="field-group">
-              <div class="field-header">
-                <label class="field-label">Remote PC</label>
-                <button id="refreshPcsBtn" class="sh-link-btn">Refresh</button>
-              </div>
-              <div class="row-gap">
-                <input
-                  id="addPcAddressInput"
-                  type="text"
-                  class="sh-input flex-1"
-                  placeholder="IP or Tailscale address (e.g. 100.108.42.59)"
-                />
-                <button id="confirmAddPcBtn" class="sh-btn sh-btn-primary">Add</button>
-              </div>
-            </div>
+      <section id="clientHomeView" class="stack-sections hidden">
+        <div class="section-block">
+          <div class="section-head">
+            <span class="section-title">Add computer</span>
+            <button id="refreshPcsBtn" class="section-link">Refresh</button>
+          </div>
 
-            <div id="pcCardsGrid" class="stack-xs"></div>
+          <div class="soft-card input-pill-card">
+            <span class="plus-glyph">+</span>
+            <input
+              id="addPcAddressInput"
+              type="text"
+              class="bare-input"
+              placeholder="Enter PC IP or Tailscale address"
+            />
+            <button id="confirmAddPcBtn" class="accent-pill-btn">Add</button>
+          </div>
+        </div>
 
-            <div id="emptyPcState" class="empty-box hidden">
-              No saved PCs.
-            </div>
+        <div class="section-block">
+          <div class="section-head">
+            <span class="section-title">Computers</span>
+          </div>
+
+          <div id="pcCardsGrid" class="stack-xs"></div>
+
+          <div id="emptyPcState" class="soft-card empty-box hidden">
+            No computers added yet
           </div>
         </div>
       </section>
-
-      <!-- Subtle Auto-Update Status Row -->
-      <footer class="home-meta-footer">
-        <span id="updateVersionLabel" class="footer-muted">Auto-updates enabled</span>
-        <button id="checkUpdatesBtn" class="sh-link-btn">Check for updates</button>
-      </footer>
     </div>
   </div>
 
@@ -152,23 +187,22 @@
   <div id="sessionView" class="session-shell hidden">
     <header class="session-header">
       <div class="row-gap-sm">
-        <button id="disconnectBtn" class="sh-btn sh-btn-ghost sh-btn-sm">
-          ← Disconnect
+        <button id="disconnectBtn" class="soft-pill-btn sh-btn-sm">
+          ← Back
         </button>
-        <span class="header-sep"></span>
         <span id="headerTitle" class="session-title">Remote PC</span>
         <span id="uacAlertBadge" class="uac-pill hidden">UAC / Lock Screen</span>
       </div>
 
-      <div class="sh-tabs-list">
-        <button class="sh-tabs-trigger session-tab active" data-tab="desktop">Desktop</button>
-        <button class="sh-tabs-trigger session-tab" data-tab="terminal">Terminal</button>
-        <button class="sh-tabs-trigger session-tab" data-tab="files">Files</button>
-        <button class="sh-tabs-trigger session-tab" data-tab="processes">Processes</button>
+      <div class="pill-tabs">
+        <button class="pill-tab session-tab active" data-tab="desktop">Desktop</button>
+        <button class="pill-tab session-tab" data-tab="terminal">Terminal</button>
+        <button class="pill-tab session-tab" data-tab="files">Files</button>
+        <button class="pill-tab session-tab" data-tab="processes">Processes</button>
       </div>
 
       <div class="row-gap-sm">
-        <span id="videoStats" class="sh-badge sh-badge-outline hidden"></span>
+        <span id="videoStats" class="sh-badge hidden"></span>
         <select id="sessionMonitorSelect" class="sh-select" aria-label="Remote display" title="Choose the Windows monitor">
           <option value="0">Display 1</option>
         </select>
@@ -177,9 +211,9 @@
           <option value="balanced" selected>Balanced</option>
           <option value="low">Low Data</option>
         </select>
-        <button id="fitWindowBtn" class="sh-btn sh-btn-outline sh-btn-sm">Fit Display</button>
-        <button id="curtainBtn" class="sh-btn sh-btn-outline sh-btn-sm hidden" disabled title="Screen blanking is temporarily unavailable">Blank PC</button>
-        <button id="sasBtn" class="sh-btn sh-btn-outline sh-btn-sm">Ctrl+Alt+Del</button>
+        <button id="fitWindowBtn" class="soft-pill-btn sh-btn-sm">Fit Display</button>
+        <button id="curtainBtn" class="soft-pill-btn sh-btn-sm hidden" disabled>Blank PC</button>
+        <button id="sasBtn" class="soft-pill-btn sh-btn-sm">Ctrl+Alt+Del</button>
       </div>
     </header>
 
@@ -190,7 +224,7 @@
         <div id="externalStreamPanel" class="desktop-overlay hidden">
           <h2>Desktop in its own window</h2>
           <p id="externalStreamStatus">Opening stream window…</p>
-          <button id="openStreamWindowBtn" class="sh-btn sh-btn-primary">Open stream window</button>
+          <button id="openStreamWindowBtn" class="accent-pill-btn">Open stream window</button>
           <p class="footer-muted">For a pointer with no delay, press Control + Option + Shift + C each time the stream opens. Control + Option + Shift + N hides the PC's own pointer; the PC remembers that until you press it again.</p>
           <p class="footer-muted">The stream opens full screen. With Control + Option + Shift held: X switches to a window, Z frees your mouse and keys, Q stops the stream, F1 / F2 switch PC displays.</p>
           <p class="footer-muted">Files and Terminal stay here in Orbit.</p>
@@ -205,7 +239,7 @@
     <!-- Tab 2: Remote Terminal -->
     <div id="tabTerminal" class="session-pane hidden">
       <div class="pane-wrap">
-        <div class="sh-card pane-card">
+        <div class="soft-card pane-card">
           <div class="pane-bar">
             <div class="row-gap-sm">
               <select id="termShellSelect" class="sh-select">
@@ -214,17 +248,18 @@
               </select>
               <span class="footer-muted">Remote execution</span>
             </div>
-            <button id="clearTermBtn" class="sh-btn sh-btn-ghost sh-btn-sm">Clear</button>
+            <button id="clearTermBtn" class="soft-pill-btn sh-btn-sm">Clear</button>
           </div>
           <pre id="termOutput" class="term-output"></pre>
-          <div class="row-gap pt-3">
+          <div class="soft-card input-pill-card mt-3">
+            <span class="plus-glyph">&gt;</span>
             <input
               id="termInput"
               type="text"
-              class="sh-input flex-1 mono"
+              class="bare-input mono"
               placeholder="Enter PowerShell or CMD command..."
             />
-            <button id="sendTermBtn" class="sh-btn sh-btn-primary">Run</button>
+            <button id="sendTermBtn" class="accent-pill-btn">Run</button>
           </div>
         </div>
       </div>
@@ -233,16 +268,16 @@
     <!-- Tab 3: Remote Files -->
     <div id="tabFiles" class="session-pane hidden">
       <div class="pane-wrap">
-        <div class="sh-card pane-card">
+        <div class="soft-card pane-card">
           <div class="pane-bar">
             <div class="row-gap-sm flex-1">
-              <button id="fileDrivesBtn" class="sh-btn sh-btn-outline sh-btn-sm">Drives</button>
-              <button id="fileUpBtn" class="sh-btn sh-btn-outline sh-btn-sm">↑ Up</button>
+              <button id="fileDrivesBtn" class="soft-pill-btn sh-btn-sm">Drives</button>
+              <button id="fileUpBtn" class="soft-pill-btn sh-btn-sm">↑ Up</button>
               <code id="fileCurrentPath" class="path-code flex-1 truncate">Computer</code>
             </div>
             <div class="row-gap-sm">
-              <button id="fileUploadBtn" class="sh-btn sh-btn-primary sh-btn-sm">Upload</button>
-              <button id="fileRefreshBtn" class="sh-btn sh-btn-outline sh-btn-sm">Refresh</button>
+              <button id="fileUploadBtn" class="accent-pill-btn sh-btn-sm">Upload</button>
+              <button id="fileRefreshBtn" class="soft-pill-btn sh-btn-sm">Refresh</button>
             </div>
           </div>
           <div id="fileListContainer" class="table-scroll"></div>
@@ -253,14 +288,14 @@
     <!-- Tab 4: Remote Processes -->
     <div id="tabProcesses" class="session-pane hidden">
       <div class="pane-wrap">
-        <div class="sh-card pane-card">
+        <div class="soft-card pane-card">
           <div class="pane-bar">
-            <span class="field-label">Running Processes</span>
+            <span class="section-title">Running processes</span>
             <div class="row-gap-sm">
-              <button id="syncClipBtn" class="sh-btn sh-btn-outline sh-btn-sm">Sync Clipboard</button>
-              <button id="powerLockBtn" class="sh-btn sh-btn-outline sh-btn-sm">Lock PC</button>
-              <button id="powerRestartBtn" class="sh-btn sh-btn-destructive sh-btn-sm">Restart PC</button>
-              <button id="procRefreshBtn" class="sh-btn sh-btn-outline sh-btn-sm">Refresh</button>
+              <button id="syncClipBtn" class="soft-pill-btn sh-btn-sm">Sync Clipboard</button>
+              <button id="powerLockBtn" class="soft-pill-btn sh-btn-sm">Lock PC</button>
+              <button id="powerRestartBtn" class="soft-pill-btn sh-btn-sm">Restart PC</button>
+              <button id="procRefreshBtn" class="soft-pill-btn sh-btn-sm">Refresh</button>
             </div>
           </div>
           <div id="procListContainer" class="table-scroll"></div>
@@ -271,14 +306,14 @@
 
   <!-- Pairing PIN Modal -->
   <div id="pairPinModal" class="sh-dialog-backdrop hidden">
-    <div class="sh-dialog">
-      <div class="field-label">Pair with PC</div>
-      <p class="field-hint mt-1">
+    <div class="soft-card sh-dialog">
+      <div class="setting-name">Pair with PC</div>
+      <p class="computer-sub mt-1">
         Enter this 4-digit PIN in Orbit on <strong id="pairModalHostLabel">your PC</strong>:
       </p>
       <div id="pairModalPinDisplay" class="pin-hero">----</div>
       <div class="dialog-footer">
-        <button id="cancelPairModalBtn" class="sh-btn sh-btn-outline sh-btn-sm">Cancel</button>
+        <button id="cancelPairModalBtn" class="soft-pill-btn">Cancel</button>
       </div>
     </div>
   </div>

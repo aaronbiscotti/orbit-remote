@@ -1,20 +1,20 @@
 :root {
-  --bg: #000000;
-  --card: #0a0a0a;
-  --card-footer: #050505;
-  --fg: #ededed;
-  --muted: #888888;
-  --subtle: #555555;
-  --border: #1f1f1f;
-  --border-strong: #2e2e2e;
-  --input-bg: #000000;
-  --primary: #ededed;
-  --primary-fg: #000000;
-  --secondary: #141414;
-  --secondary-hover: #1f1f1f;
-  --emerald: #10b981;
-  --radius: 8px;
-  --radius-sm: 6px;
+  --bg: #111111;
+  --card: #191919;
+  --card-hover: #202020;
+  --pill: #252525;
+  --pill-hover: #2e2e2e;
+  --border: #252525;
+  --fg: #f2f2f2;
+  --muted: #8a8a8a;
+  --subtle: #666666;
+  --accent: #d97706;
+  --accent-hover: #ea8612;
+  --emerald: #22c55e;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Consolas", monospace;
 }
 
 * {
@@ -29,300 +29,227 @@ body {
   height: 100%;
   background-color: var(--bg);
   color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
   overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 .hidden {
   display: none !important;
 }
 
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
+
 /* ============================================================================
-   Home Shell (Vercel Minimal Centered Layout — No Shadows, No Glow)
+   Custom Frameless Top Bar (Matches Top-Right of Reference Image)
+   ============================================================================ */
+.window-titlebar {
+  height: 44px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 14px;
+  background: var(--bg);
+}
+
+.titlebar-drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.titlebar-left,
+.titlebar-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.circle-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: #b0b0b0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.circle-icon-btn:hover {
+  background: var(--pill);
+  color: var(--fg);
+}
+
+.win-ctrl-btn {
+  width: 32px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: #9a9a9a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.win-ctrl-btn:hover {
+  background: var(--card);
+  color: var(--fg);
+}
+
+.win-ctrl-btn.win-close:hover {
+  background: #3a181b;
+  color: #f87171;
+}
+
+/* ============================================================================
+   Home Shell & Centered Header (Activity / Library Pill Tab Style)
    ============================================================================ */
 .home-shell {
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - 44px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 28px 20px;
+  padding: 2px 24px 20px;
 }
 
 .home-container {
   width: 100%;
-  max-width: 460px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
-.home-header {
+.hero-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
-.home-meta-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 2px;
-}
-
-.brand {
+.hero-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.vercel-mark {
-  color: var(--fg);
-  flex-shrink: 0;
-}
-
 .brand-name {
-  font-size: 14px;
+  font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--fg);
 }
 
-.status-inline {
+.pill-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
+  gap: 4px;
 }
 
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #444444;
-}
-
-.dot.online {
-  background: var(--emerald);
-}
-
-/* ============================================================================
-   shadcn / Vercel Card & Sections
-   ============================================================================ */
-.sh-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.card-body {
-  padding: 20px;
-}
-
-.card-footer {
-  background: var(--card-footer);
-  border-top: 1px solid var(--border);
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.footer-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.admin-check {
-  color: var(--fg);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.footer-muted {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.sh-divider {
-  height: 1px;
-  background: var(--border);
-  width: 100%;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.field-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.field-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--fg);
-}
-
-.field-hint {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.field-hint.active-wait {
-  color: var(--fg);
-  font-weight: 500;
-}
-
-/* Address Copy Box */
-.input-Copy-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--input-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  height: 36px;
-  padding: 0 6px 0 12px;
-}
-
-.ip-value {
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--fg);
-  user-select: text;
-}
-
-/* ============================================================================
-   shadcn Controls (Tabs, Buttons, Inputs, Switch — Flat, No Shadows)
-   ============================================================================ */
-.sh-tabs-list {
-  display: inline-flex;
-  height: 32px;
-  align-items: center;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px;
-}
-
-.sh-tabs-trigger {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
+.pill-tab {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
   background: transparent;
   border: none;
-  cursor: pointer;
-  transition: color 0.1s ease, background-color 0.1s ease;
-  white-space: nowrap;
-}
-
-.sh-tabs-trigger:hover {
-  color: var(--fg);
-}
-
-.sh-tabs-trigger.active {
-  background: #1f1f1f;
-  color: var(--fg);
-}
-
-.sh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  padding: 0 14px;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 500;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
   cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
   white-space: nowrap;
-  flex-shrink: 0;
-  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
 }
 
-.sh-btn:disabled {
-  opacity: 0.4;
-  pointer-events: none;
+.pill-tab:hover {
+  color: var(--fg);
 }
 
-.sh-btn-sm {
-  height: 26px;
-  padding: 0 10px;
+.pill-tab.active {
+  background: var(--pill);
+  color: var(--fg);
+}
+
+/* ============================================================================
+   Outside Section Headers & Rounded #191919 Cards
+   ============================================================================ */
+.stack-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.section-title {
   font-size: 12px;
-  border-radius: 4px;
-}
-
-.sh-btn-primary {
-  background: var(--primary);
-  color: var(--primary-fg);
-}
-
-.sh-btn-primary:hover {
-  background: #cccccc;
-}
-
-.sh-btn-secondary {
-  background: var(--secondary);
-  color: var(--fg);
-  border-color: var(--border-strong);
-}
-
-.sh-btn-secondary:hover {
-  background: var(--secondary-hover);
-}
-
-.sh-btn-outline {
-  background: transparent;
-  border-color: var(--border-strong);
-  color: var(--fg);
-}
-
-.sh-btn-outline:hover {
-  background: var(--secondary);
-}
-
-.sh-btn-ghost {
-  background: transparent;
+  font-weight: 500;
   color: var(--muted);
 }
 
-.sh-btn-ghost:hover {
-  background: var(--secondary);
-  color: var(--fg);
+.section-action,
+.field-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
-.sh-btn-destructive {
-  background: #2a1215;
-  border-color: #5c2126;
-  color: #f87171;
+.section-action.active-wait,
+.field-hint.active-wait {
+  color: #f59e0b;
+  font-weight: 500;
 }
 
-.sh-btn-destructive:hover {
-  background: #3b181c;
-}
-
-.sh-link-btn {
+.section-link {
   background: none;
   border: none;
   color: var(--muted);
@@ -330,91 +257,198 @@ body {
   font-weight: 400;
   cursor: pointer;
   padding: 0;
-  transition: color 0.1s ease;
+  transition: color 0.12s ease;
 }
 
-.sh-link-btn:hover {
+.section-link:hover {
   color: var(--fg);
 }
 
-.sh-btn-icon {
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #525252;
+}
+
+.dot.online {
+  background: var(--emerald);
+}
+
+.soft-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+/* Computer Card (Bot's computer / Asleep style) */
+.computer-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.computer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.computer-ip {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+  user-select: text;
+}
+
+.computer-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Pill Input Card (+ Message Amina style) */
+.input-pill-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+}
+
+.plus-glyph {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.bare-input {
+  flex: 1;
+  height: 30px;
   background: transparent;
   border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.sh-btn-icon:hover {
   color: var(--fg);
-  background: var(--secondary);
-}
-
-.sh-input {
-  height: 36px;
-  width: 100%;
-  background: var(--input-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 0 12px;
-  font-size: 13px;
-  color: var(--fg);
+  font-size: 13.5px;
   outline: none;
-  transition: border-color 0.1s ease;
 }
 
-.sh-input::placeholder {
+.bare-input::placeholder {
   color: var(--subtle);
 }
 
-.sh-input:focus {
-  border-color: #888888;
-}
-
-.pin-box {
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  letter-spacing: 0.08em;
-}
-
-.sh-select {
-  height: 28px;
-  background: var(--input-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  color: var(--fg);
-  padding: 0 8px;
-  font-size: 12px;
-  outline: none;
-}
-
-.sh-badge {
+/* Buttons */
+.soft-pill-btn {
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #282828;
+  border: 1px solid #323232;
+  color: var(--fg);
+  font-size: 12.5px;
   font-weight: 500;
-  border-radius: 4px;
-  border: 1px solid var(--border-strong);
-  color: var(--muted);
+  cursor: pointer;
   white-space: nowrap;
+  transition: background-color 0.12s ease;
 }
 
-/* Switch */
-.switch-row {
+.soft-pill-btn:hover {
+  background: #333333;
+}
+
+.soft-pill-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.accent-pill-btn {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 15px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  border: none;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s ease;
+}
+
+.accent-pill-btn:hover {
+  background: var(--accent-hover);
+}
+
+.accent-pill-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.sh-btn-sm {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+/* Settings Multi-Row Card (Voice / Speed / Language style) */
+.settings-card {
+  padding: 6px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.setting-name {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--fg);
+}
+
+.setting-right {
+  display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.setting-val {
+  font-size: 13px;
+  color: #c8c8c8;
+}
+
+.setting-action-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 
+.setting-action-btn:hover {
+  color: var(--accent-hover);
+}
+
+/* Switch */
 .sh-switch {
   position: relative;
   display: inline-block;
-  width: 32px;
-  height: 18px;
+  width: 34px;
+  height: 19px;
+  cursor: pointer;
 }
 
 .sh-switch input {
@@ -426,7 +460,7 @@ body {
 .sh-switch-slider {
   position: absolute;
   inset: 0;
-  background-color: #262626;
+  background-color: #2b2b2b;
   border-radius: 999px;
   transition: 0.12s ease;
 }
@@ -434,37 +468,47 @@ body {
 .sh-switch-slider::before {
   content: "";
   position: absolute;
-  height: 12px;
-  width: 12px;
+  height: 13px;
+  width: 13px;
   left: 3px;
   bottom: 3px;
-  background-color: #888888;
+  background-color: #9a9a9a;
   border-radius: 50%;
   transition: 0.12s ease;
 }
 
 .sh-switch input:checked + .sh-switch-slider {
-  background-color: var(--fg);
+  background-color: var(--accent);
 }
 
 .sh-switch input:checked + .sh-switch-slider::before {
-  transform: translateX(14px);
-  background-color: var(--bg);
+  transform: translateX(15px);
+  background-color: #ffffff;
 }
 
 /* ============================================================================
    List Items (Paired Devices & Remote PCs)
    ============================================================================ */
-.paired-item,
+.list-card {
+  padding: 6px 16px;
+}
+
+.paired-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
 .pc-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 12px;
-  background: var(--input-bg);
+  padding: 13px 16px;
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-card);
 }
 
 .item-left {
@@ -475,7 +519,7 @@ body {
 }
 
 .item-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--fg);
   white-space: nowrap;
@@ -486,91 +530,79 @@ body {
 .item-sub {
   font-size: 12px;
   color: var(--muted);
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 }
 
 .empty-box {
-  padding: 18px 14px;
+  padding: 20px 16px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+}
+
+/* Compatibility classes for renderer.js */
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.sh-btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.sh-btn-secondary,
+.sh-btn-outline {
+  background: #282828;
+  border: 1px solid #323232;
+  color: var(--fg);
+}
+
+.sh-btn-ghost {
+  background: transparent;
+  color: var(--muted);
+}
+
+.sh-btn-ghost:hover {
+  color: var(--fg);
+}
+
+.sh-btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.sh-btn-icon:hover {
+  color: var(--fg);
+  background: var(--pill);
 }
 
 /* ============================================================================
-   Utilities
-   ============================================================================ */
-.row-gap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.row-gap-sm {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.stack-lg {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.stack-md {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.stack-xs {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.mb-4 {
-  margin-bottom: 12px;
-}
-
-.mt-1 {
-  margin-top: 4px;
-}
-
-.pt-3 {
-  padding-top: 10px;
-}
-
-.mono {
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-}
-
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ============================================================================
-   Active Session View (Full Window)
+   Active Session View
    ============================================================================ */
 .session-shell {
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - 44px);
   display: flex;
   flex-direction: column;
-  background: #000;
+  background: var(--bg);
 }
 
 .session-header {
   height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -579,25 +611,41 @@ body {
   gap: 10px;
 }
 
-.header-sep {
-  width: 1px;
-  height: 14px;
-  background: var(--border-strong);
-}
-
 .session-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 
 .uac-pill {
   font-size: 11px;
   font-weight: 500;
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid #4d3811;
-  background: #1c1406;
-  color: #f59e0b;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(217, 119, 6, 0.18);
+  color: #fbbf24;
+}
+
+.sh-select {
+  height: 28px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  padding: 0 10px;
+  font-size: 12px;
+  outline: none;
+}
+
+.sh-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -611,7 +659,7 @@ body {
 .desktop-viewport {
   position: relative;
   flex: 1;
-  background: #000;
+  background: #0a0a0a;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -635,7 +683,7 @@ body {
   gap: 12px;
   padding: 28px;
   text-align: center;
-  background: #000000;
+  background: var(--bg);
 }
 
 .desktop-overlay h2 {
@@ -644,13 +692,18 @@ body {
 }
 
 .desktop-overlay p {
-  max-width: 520px;
+  max-width: 500px;
+}
+
+.footer-muted {
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
 .sh-spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid #262626;
+  border: 2px solid #2b2b2b;
   border-top-color: var(--fg);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
@@ -663,7 +716,7 @@ body {
 }
 
 .pane-wrap {
-  max-width: 900px;
+  max-width: 860px;
   width: 100%;
   height: 100%;
   margin: 0 auto;
@@ -674,7 +727,7 @@ body {
 
 .pane-card {
   flex: 1;
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -685,27 +738,27 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
 
 .path-code {
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
-  background: var(--input-bg);
+  background: var(--bg);
   border: 1px solid var(--border);
-  padding: 3px 8px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
 }
 
 .term-output {
   flex: 1;
-  margin-top: 10px;
-  background: #000000;
+  margin-top: 12px;
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px;
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--fg);
   overflow-y: auto;
@@ -723,16 +776,52 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 10px;
+  padding: 9px 8px;
   border-bottom: 1px solid var(--border);
 }
 
-.table-row:hover {
-  background: #111111;
+.row-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row-gap-sm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stack-xs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.mt-1 {
+  margin-top: 4px;
+}
+
+.mt-3 {
+  margin-top: 10px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================================================
-   Toast & Modal (Flat, Hairline Border, Zero Shadow)
+   Toast & Modal
    ============================================================================ */
 .sh-toast {
   position: fixed;
@@ -740,20 +829,20 @@ body {
   right: 16px;
   z-index: 80;
   background: var(--card);
-  border: 1px solid var(--border-strong);
+  border: 1px solid #303030;
   color: var(--fg);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .sh-dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -762,23 +851,20 @@ body {
 
 .sh-dialog {
   width: 340px;
-  background: var(--card);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
   padding: 20px;
 }
 
 .pin-hero {
   margin: 16px 0;
-  padding: 12px;
+  padding: 14px;
   text-align: center;
-  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 26px;
   font-weight: 600;
   letter-spacing: 8px;
-  background: var(--input-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .dialog-footer {

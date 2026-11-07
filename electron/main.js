@@ -1119,6 +1119,21 @@ function registerIpcHandlers() {
   ipcMain.handle('app:check-updates', async () => {
     return await checkAndApplyCodeUpdates({ manual: true, pullRemote: true });
   });
+
+  ipcMain.handle('window:minimize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
+  });
+
+  ipcMain.handle('window:maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+    }
+  });
+
+  ipcMain.handle('window:close', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  });
 }
 
 // ============================================================================
@@ -1245,10 +1260,11 @@ async function checkAndApplyCodeUpdates({ manual = false, pullRemote = false } =
       if (!fs.existsSync(srcFile)) continue;
 
       const srcHash = sha256File(srcFile);
-      const dstHash = sameDir ? runtimeFileHashes.get(rel) || '' : sha256File(dstFile);
+      const diskDstHash = sameDir ? '' : sha256File(dstFile);
+      const memHash = runtimeFileHashes.get(rel) || diskDstHash;
 
-      if (srcHash && srcHash !== dstHash) {
-        if (!sameDir) {
+      if (srcHash && (srcHash !== memHash || (!sameDir && srcHash !== diskDstHash))) {
+        if (!sameDir && srcHash !== diskDstHash) {
           fs.mkdirSync(path.dirname(dstFile), { recursive: true });
           fs.copyFileSync(srcFile, dstFile);
         }
@@ -1360,11 +1376,13 @@ async function startAutoUpdateEngine() {
 // ============================================================================
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 720,
-    height: 580,
-    minWidth: 540,
+    width: 680,
+    height: 640,
+    minWidth: 500,
     minHeight: 480,
-    backgroundColor: '#000000',
+    frame: false,
+    titleBarStyle: 'hidden',
+    backgroundColor: '#111111',
     title: 'Orbit',
     icon: path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'),
     autoHideMenuBar: true,

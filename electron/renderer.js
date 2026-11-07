@@ -77,7 +77,7 @@
       const statusLabel = $('hostStatusLabel');
       if (st.running) {
         dot.className = 'dot online';
-        statusLabel.textContent = st.activeSessions > 0 ? `${st.activeSessions} active session` : 'Ready to connect';
+        statusLabel.textContent = st.activeSessions > 0 ? `${st.activeSessions} connected` : 'Online';
       } else {
         dot.className = 'dot';
         statusLabel.textContent = 'Starting...';
@@ -90,11 +90,11 @@
 
       if (isSystem) {
         checkIcon.classList.remove('hidden');
-        statusText.textContent = 'Administrator & UAC access active';
+        statusText.textContent = 'Active';
         enableBtn.classList.add('hidden');
       } else {
         checkIcon.classList.add('hidden');
-        statusText.textContent = 'Standard user access';
+        statusText.textContent = 'Standard';
         enableBtn.classList.remove('hidden');
       }
 
@@ -103,10 +103,10 @@
       const hint = $('pendingPairHint');
       if (pendingPairingsList.length > 0) {
         const latest = pendingPairingsList[0];
-        hint.textContent = `● ${latest.name || 'Mac'} is waiting — enter PIN below`;
+        hint.textContent = `● ${latest.name || 'Mac'} waiting`;
         hint.className = 'field-hint active-wait';
       } else {
-        hint.textContent = 'Enter the 4-digit PIN shown on your Mac';
+        hint.textContent = '4-digit PIN';
         hint.className = 'field-hint';
       }
 
@@ -953,8 +953,13 @@
   });
 
   // ============================================================================
-  // Bootstrap & Auto-Update Controls
+  // Frameless Window & Auto-Update Controls
   // ============================================================================
+  $('winMinBtn')?.addEventListener('click', () => orbit.minimizeWindow?.());
+  $('winMaxBtn')?.addEventListener('click', () => orbit.maximizeWindow?.());
+  $('winCloseBtn')?.addEventListener('click', () => orbit.closeWindow?.());
+  $('checkUpdatesCircleBtn')?.addEventListener('click', () => $('checkUpdatesBtn')?.click());
+
   $('checkUpdatesBtn').addEventListener('click', async () => {
     const btn = $('checkUpdatesBtn');
     const prev = btn.textContent;
@@ -963,7 +968,7 @@
     try {
       const res = await orbit.checkForUpdates();
       if (res && res.commit) {
-        $('updateVersionLabel').textContent = `Auto-updates enabled · ${res.commit}`;
+        $('updateVersionLabel').textContent = `Automatic · ${res.commit} ›`;
       }
       if (res && res.message) {
         showBanner(res.message);
@@ -979,7 +984,7 @@
   if (orbit.onUpdateEvent) {
     orbit.onUpdateEvent((evt) => {
       if (evt && evt.commit) {
-        $('updateVersionLabel').textContent = `Auto-updates enabled · ${evt.commit}`;
+        $('updateVersionLabel').textContent = `Automatic · ${evt.commit} ›`;
       }
       if (evt && evt.message) {
         showBanner(evt.message);
