@@ -17,7 +17,7 @@ public sealed record HostLiveStatus(string Privilege, string Desktop, bool Secur
 public sealed class SunshineApi : IDisposable
 {
     private readonly HttpClient client;
-    public SunshineApi(string username, string password, string certificatePath, int port = 47990)
+    public SunshineApi(string username, string password, string certificatePath, int port = TakeoverServer.DefaultAdminPort)
     {
         using var trusted = X509Certificate2.CreateFromPem(File.ReadAllText(certificatePath));
         var expected = SHA256.HashData(trusted.RawData);
@@ -33,7 +33,7 @@ public sealed class SunshineApi : IDisposable
 
     // Used by integration tests to exercise request formats and fail-closed behavior.
     public SunshineApi(HttpMessageHandler handler, string username, string password) =>
-        client = CreateClient(handler, username, password, 47990);
+        client = CreateClient(handler, username, password, TakeoverServer.DefaultAdminPort);
 
     private static HttpClient CreateClient(HttpMessageHandler handler, string username, string password, int port)
     {

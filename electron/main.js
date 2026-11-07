@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const { spawn, execFile, execFileSync } = require('child_process');
 const { VideoSession } = require('./video-session');
 const { NativeVideoSession } = require('./native-video-session');
+const { ENGINE_ADMIN_PORT, ENGINE_TAKEOVER_PORT } = require('./ports');
 
 
 const isSmokeTest = process.argv.includes('--smoke-test');
@@ -41,6 +42,16 @@ function getWindowsWorkRoot() {
 
 let cachedHostPaths = null;
 
+// Stops Orbit's own engine running from this folder. Matching by folder, never by name: the real Sunshine,
+// which Moonlight needs, is also called sunshine.exe, as were older Orbit copies.
+function stopOrbitEngine(folder) {
+  const prefix = folder.replace(/'/g, "''");
+  const command = `Get-Process -Name 'Orbit.Host','sunshine' -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '${prefix}\\*' } | Stop-Process -Force`;
+  try {
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { stdio: 'ignore', windowsHide: true, timeout: 20000 });
+  } catch {}
+}
+
 function ensureWindowsHostPrepared(force = false) {
   if (!isWindows) return null;
   if (cachedHostPaths && !force && hostAdminCredentials) {
@@ -71,52 +82,38 @@ function ensureWindowsHostPrepared(force = false) {
     ? path.join(resourceRoot, 'engine')
     : path.join(resourceRoot, 'dist', 'Orbit-Host');
 
-  const agentExe = path.join(runtimeDir, 'sunshine.exe');
-  const srcCoreDll = path.join(srcEngine, 'Orbit.Core.dll');
-  const dstCoreDll = path.join(runtimeDir, 'Orbit.Core.dll');
-  let engineNeedsSync = !fs.existsSync(agentExe);
-  if (!engineNeedsSync && fs.existsSync(srcCoreDll) && fs.existsSync(dstCoreDll)) {
+  // This is the only place that copies the engine. It runs from this folder, not from the installed app,
+  // so installing an update never has to overwrite files a running engine is using.
+  const agentExe = path.join(runtimeDir, 'Orbit.Host.exe');
+  const engineFingerprint = (dir) => ['Orbit.Core.dll', 'Orbit.Host.dll'].map((name) => {
     try {
-      const sHash = crypto.createHash('sha256').update(fs.readFileSync(srcCoreDll)).digest('hex');
-      const dHash = crypto.createHash('sha256').update(fs.readFileSync(dstCoreDll)).digest('hex');
-      engineNeedsSync = sHash !== dHash;
-    } catch {}
-  }
-
-  if (fs.existsSync(path.join(srcEngine, 'Orbit.Host.exe')) && engineNeedsSync) {
-    // Stop this user's engine first: Windows won't overwrite files it is running, and a half-copied engine
-    // (old and new files mixed) drops every connection. The SYSTEM service runs its own copy in Program Files.
-    try {
-      // Match by folder: the real Sunshine, which Moonlight needs, is also called sunshine.exe.
-      const stopOwnCopy = `Get-Process sunshine -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '${runtimeDir.replace(/'/g, "''")}\\*' } | Stop-Process -Force`;
-      execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', stopOwnCopy], { stdio: 'ignore', windowsHide: true, timeout: 20000 });
-    } catch {}
+      return crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, name))).digest('hex');
+    } catch {
+      return '';
+    }
+  }).join(':');
+  const staleEngine = !fs.existsSync(agentExe) || engineFingerprint(runtimeDir) !== engineFingerprint(srcEngine);
+  if (fs.existsSync(path.join(srcEngine, 'Orbit.Host.exe')) && staleEngine) {
+    // Stop the copy first: Windows won't overwrite running files, and a half-copied engine drops every connection.
+    stopOrbitEngine(runtimeDir);
+    let incomplete = false;
     for (const file of fs.readdirSync(srcEngine)) {
       const fullSrc = path.join(srcEngine, file);
       if (fs.statSync(fullSrc).isFile()) {
         try {
           fs.copyFileSync(fullSrc, path.join(runtimeDir, file));
-        } catch {}
+        } catch {
+          incomplete = true;
+        }
       }
     }
-    try {
-      fs.copyFileSync(path.join(srcEngine, 'Orbit.Host.exe'), agentExe);
-    } catch {}
-    if (fs.existsSync(path.join(srcEngine, 'Orbit.Host.runtimeconfig.json'))) {
-      try {
-        fs.copyFileSync(
-          path.join(srcEngine, 'Orbit.Host.runtimeconfig.json'),
-          path.join(runtimeDir, 'sunshine.runtimeconfig.json')
-        );
-      } catch {}
+    // A failed copy must not look current, so the next check copies again.
+    if (incomplete) {
+      try { fs.rmSync(path.join(runtimeDir, 'Orbit.Core.dll'), { force: true }); } catch {}
     }
-    if (fs.existsSync(path.join(srcEngine, 'Orbit.Host.deps.json'))) {
-      try {
-        fs.copyFileSync(
-          path.join(srcEngine, 'Orbit.Host.deps.json'),
-          path.join(runtimeDir, 'sunshine.deps.json')
-        );
-      } catch {}
+    // Older versions also ran a renamed copy called sunshine.exe, the same name as the real Sunshine.
+    for (const old of ['sunshine.exe', 'sunshine.runtimeconfig.json', 'sunshine.deps.json']) {
+      try { fs.rmSync(path.join(runtimeDir, old), { force: true }); } catch {}
     }
   }
 
@@ -126,9 +123,7 @@ function ensureWindowsHostPrepared(force = false) {
       configFile,
       [
         `sunshine_name = ${os.hostname()}`,
-        'engine = orbit-takeover',
-        'takeover_port = 47995',
-        'admin_port = 47990'
+        'engine = orbit-takeover'
       ].join('\n'),
       'utf8'
     );
@@ -365,7 +360,7 @@ function adminApiRequest(method, apiPath, bodyObj = null, customCreds = null) {
     const req = https.request(
       {
         hostname: '127.0.0.1',
-        port: 47990,
+        port: ENGINE_ADMIN_PORT,
         path: '/' + apiPath.replace(/^\/+/, ''),
         method,
         headers,
@@ -404,7 +399,7 @@ function adminApiRequest(method, apiPath, bodyObj = null, customCreds = null) {
 
 function isEngineProcessRunning() {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host: '127.0.0.1', port: 47990, timeout: 600 });
+    const socket = net.createConnection({ host: '127.0.0.1', port: ENGINE_ADMIN_PORT, timeout: 600 });
     socket.on('connect', () => {
       socket.destroy();
       resolve(true);
@@ -525,7 +520,7 @@ function parseHostPort(addressInput) {
       return { host: trimmed.slice(0, idx), port };
     }
   }
-  return { host: trimmed, port: 47995 };
+  return { host: trimmed, port: ENGINE_TAKEOVER_PORT };
 }
 
 function probeSingleComputer(entry, cfg) {
@@ -816,7 +811,7 @@ function registerIpcHandlers() {
   ipcMain.handle('client:add-pc', async (_event, { address }) => {
     const { host, port } = parseHostPort(address);
     if (!host) throw new Error('Enter a PC IP or Tailscale address.');
-    const canonical = port === 47995 ? host : `${host}:${port}`;
+    const canonical = port === ENGINE_TAKEOVER_PORT ? host : `${host}:${port}`;
     const cfg = loadClientConfig();
     let existing = cfg.computers.find((c) => c.address.toLowerCase() === canonical.toLowerCase());
     if (!existing) {

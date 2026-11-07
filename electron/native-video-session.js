@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const { spawn, execFile } = require('node:child_process');
 const { EventEmitter } = require('node:events');
+const { SUNSHINE_BASE_PORT } = require('./ports');
 
 const MOONLIGHT_PREFS = 'com.moonlight-stream.Moonlight';
 const run = (cmd, args) => new Promise((resolve, reject) =>
@@ -12,7 +13,7 @@ function streamArgs(profile) {
   const clamp = (v, fallback, min, max) => Math.round(Math.max(min, Math.min(max, Number(v) || fallback)));
   const host = String(profile.host || '');
   if (!/^[a-zA-Z0-9.:-]+$/.test(host) || host.startsWith('-')) throw new Error('Invalid streaming host.');
-  return ['stream', `${host}:${clamp(profile.port, 47989, 1, 65535)}`, 'Desktop',
+  return ['stream', `${host}:${clamp(profile.port, SUNSHINE_BASE_PORT, 1, 65535)}`, 'Desktop',
     '--resolution', `${clamp(profile.width,1920,640,3840)}x${clamp(profile.height,1080,480,2160)}`,
     '--fps', String(clamp(profile.fps,120,30,120)), '--bitrate', String(clamp(profile.bitrate,10000,3000,40000)),
     // Full screen lets macOS show frames without compositing the window first.
@@ -53,7 +54,7 @@ class NativeVideoSession extends EventEmitter {
     if (!fs.existsSync(this.executable)) throw new Error('Install Moonlight in Applications to open the stream window.');
     const p = this.profile;
     // At home the PC's home-network address answers; away from home use the Tailscale fallback.
-    const host = p.fallbackHost && !(await this.probe(p.host, Number(p.port) || 47989)) ? p.fallbackHost : p.host;
+    const host = p.fallbackHost && !(await this.probe(p.host, Number(p.port) || SUNSHINE_BASE_PORT)) ? p.fallbackHost : p.host;
     await prepareMoonlight(host, [p.host, p.fallbackHost].filter(Boolean), this.exec)
       .catch((error) => console.log('ORBIT_MOONLIGHT_PREFS', error.message));
     const args = streamArgs({ ...p, host });

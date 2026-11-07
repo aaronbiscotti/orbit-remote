@@ -18,7 +18,7 @@ public static class Program
             NativeWindowsService.Run(ct => RunSystemServiceLoopAsync(exePath, ct));
             return;
         }
-        // Orbit starts the agent as sunshine.exe "<config>"; the service starts it with --session-agent "<config>".
+        // Orbit starts the agent as Orbit.Host.exe "<config>"; the service starts it with --session-agent "<config>".
         RunSessionAgentAsync(ResolveAgentConfigRoot(args)).GetAwaiter().GetResult();
     }
 
@@ -54,8 +54,8 @@ public static class Program
     {
         SecureDesktopManager.ConfigureTakeoverPolicies();
         var engineDir = Path.GetDirectoryName(serviceExePath) ?? AppContext.BaseDirectory;
-        var agentExe = Path.Combine(engineDir, "sunshine.exe");
-        if (!File.Exists(agentExe)) agentExe = serviceExePath;
+        // The same program runs as the agent (any start without --service), so there is no renamed copy.
+        var agentExe = serviceExePath;
         var configFile = Path.Combine(engineDir, "config", "sunshine.conf");
 
         while (!ct.IsCancellationRequested)
