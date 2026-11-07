@@ -562,6 +562,8 @@ public sealed class TakeoverServer : IAsyncDisposable
                     removed = state.Clients.RemoveAll(c => string.Equals(c.Uuid, uuid, StringComparison.OrdinalIgnoreCase)) > 0;
                     SaveStateUnsafe(state);
                 }
+                // Unpairing a device also removes its SSH access.
+                try { SshAccess.RemoveClient(uuid); } catch { }
 
                 foreach (var kv in activeSessions)
                 {
@@ -744,6 +746,7 @@ public sealed class TakeoverServer : IAsyncDisposable
         }, null, writeLock, sessionToken);
 
         var authenticated = false;
+        var authenticatedClientId = "";
         var sessionKey = Guid.NewGuid().ToString("N");
         var selectedMonitor = 0;
         var selectedQuality = "crisp";
@@ -864,6 +867,7 @@ public sealed class TakeoverServer : IAsyncDisposable
                         }
 
                         authenticated = true;
+                        authenticatedClientId = clientId;
                         activeSessions[sessionKey] = new ConnectedClientSession
                         {
                             SessionId = sessionKey,
@@ -962,6 +966,14 @@ public sealed class TakeoverServer : IAsyncDisposable
                                 SignalWake(inputWakeSignal);
                             }
                             break;
+
+                        case "ssh_key":
+                        {
+                            // Only a paired, logged-in device gets here. Its key is tagged with its own Orbit id.
+                            var sshKey = root.TryGetProperty("key", out var skp) ? skp.GetString() ?? "" : "";
+                            try { SshAccess.AddKey(authenticatedClientId, sshKey); } catch { }
+                            break;
+                        }
 
                         case "mouse":
                         {

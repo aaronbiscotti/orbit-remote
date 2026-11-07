@@ -16,6 +16,9 @@ try {
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'SoftwareSASGeneration' -Value 3 -Type DWord -Force -ErrorAction SilentlyContinue
 } catch {}
 
+# Windows' SSH server for paired Orbit devices; Orbit's service adds each paired device's key.
+try { Enable-OrbitSsh } catch { Write-Warning "SSH could not be turned on: $($_.Exception.Message)" }
+
 # Run the SYSTEM service from a folder only administrators can change. The per-user copy lives under
 # %APPDATA%, which any program running as this user could rewrite to gain SYSTEM rights.
 $secureRoot = Join-Path $env:ProgramFiles 'Orbit\Engine'

@@ -52,6 +52,16 @@ function stopOrbitEngine(folder) {
   } catch {}
 }
 
+// This computer's own SSH public key, if it has one (public keys are safe to share).
+function readSshPublicKey() {
+  for (const name of ['id_ed25519.pub', 'id_ecdsa.pub', 'id_rsa.pub']) {
+    try {
+      return fs.readFileSync(path.join(os.homedir(), '.ssh', name), 'utf8').trim();
+    } catch {}
+  }
+  return '';
+}
+
 function ensureWindowsHostPrepared(force = false) {
   if (!isWindows) return null;
   if (cachedHostPaths && !force && hostAdminCredentials) {
@@ -995,6 +1005,9 @@ function registerIpcHandlers() {
           // Request initial file drives and process list
           writeProtocolFrame(sock, { type: 'fs_list', path: 'drives' });
           writeProtocolFrame(sock, { type: 'proc_list' });
+          // Let this paired PC accept this computer's SSH key. Orbit's administrator service adds it.
+          const sshKey = readSshPublicKey();
+          if (sshKey) writeProtocolFrame(sock, { type: 'ssh_key', key: sshKey });
           return;
         }
 

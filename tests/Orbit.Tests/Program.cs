@@ -297,6 +297,26 @@ finally
     try { Directory.Delete(tempConfigDir, recursive: true); } catch { }
 }
 
+// =============================================================================
+// 4. SSH access for paired devices: add, replace, reject and remove keys
+// =============================================================================
+{
+    var macKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJYyYYQrVmCXPutbo51rHlc9KAXzYkk5SWu29taQTNpb orbit-mac";
+    var newerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINewerKeyNewerKeyNewerKeyNewerKeyNewerKey12";
+    var existing = new[] { "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC7 someone-else" };
+    var added = SshAccess.WithKey(existing, "abc123", macKey);
+    Check(added.Count == 2 && added[1] == "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJYyYYQrVmCXPutbo51rHlc9KAXzYkk5SWu29taQTNpb orbit:abc123", "A paired device's key is stored once, tagged with its Orbit id.");
+    var replaced = SshAccess.WithKey(added, "abc123", newerKey);
+    Check(replaced.Count == 2 && replaced[1].Contains("NewerKey"), "A device's newer key replaces its older one.");
+    Check(SshAccess.WithoutClient(replaced, "abc123").SequenceEqual(existing), "Unpairing removes only that device's key.");
+    foreach (var bad in new[] { "command=\"calc\" ssh-ed25519 AAAA", "ssh-ed25519 AAAA\nssh-rsa BBBB", "not a key", "" })
+    {
+        try { SshAccess.WithKey(existing, "abc123", bad); Check(false, "A malformed SSH key was accepted."); }
+        catch (ArgumentException) { assertions++; }
+    }
+    Console.WriteLine("PASS: SSH keys of paired devices are added, replaced, rejected when malformed, and removed on unpair.");
+}
+
 Console.WriteLine($"PASS: {assertions} setup, authentication, pairing, revocation, dirty-tile zero-idle-bitrate, UAC secure desktop, and remote OS takeover assertions.");
 
 if (args.Length == 2 && args[0] == "--probe-host") {
