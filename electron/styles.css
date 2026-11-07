@@ -1,20 +1,20 @@
 :root {
-  --bg: #09090b;
-  --card: #0c0c0f;
-  --card-footer: #09090b;
-  --fg: #fafafa;
-  --muted: #a1a1aa;
-  --subtle: #71717a;
-  --border: #1f1f24;
-  --border-strong: #27272d;
-  --input-bg: #121216;
-  --primary: #fafafa;
-  --primary-fg: #09090b;
-  --secondary: #1e1e24;
-  --secondary-hover: #27272f;
+  --bg: #000000;
+  --card: #0a0a0a;
+  --card-footer: #050505;
+  --fg: #ededed;
+  --muted: #888888;
+  --subtle: #555555;
+  --border: #1f1f1f;
+  --border-strong: #2e2e2e;
+  --input-bg: #000000;
+  --primary: #ededed;
+  --primary-fg: #000000;
+  --secondary: #141414;
+  --secondary-hover: #1f1f1f;
   --emerald: #10b981;
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 8px;
+  --radius-sm: 6px;
 }
 
 * {
@@ -28,10 +28,9 @@ body {
   width: 100%;
   height: 100%;
   background-color: var(--bg);
-  background-image: radial-gradient(700px circle at 50% -120px, rgba(120, 140, 255, 0.065), transparent 70%);
   color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
-  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
   line-height: 1.5;
   overflow: hidden;
   user-select: none;
@@ -43,7 +42,7 @@ body {
 }
 
 /* ============================================================================
-   Home Shell (Centered 520px Aligned Layout)
+   Home Shell (Vercel Minimal Centered Layout — No Shadows, No Glow)
    ============================================================================ */
 .home-shell {
   width: 100%;
@@ -53,57 +52,46 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
+  padding: 28px 20px;
 }
 
 .home-container {
   width: 100%;
-  max-width: 500px;
+  max-width: 460px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .home-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px;
 }
 
 .home-meta-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px;
-  opacity: 0.85;
+  padding: 0 2px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.brand-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  object-fit: cover;
-  box-shadow: 0 2px 14px rgba(96, 239, 255, 0.22);
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+.vercel-mark {
+  color: var(--fg);
+  flex-shrink: 0;
 }
 
 .brand-name {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  color: var(--fg);
 }
 
 .status-inline {
@@ -118,33 +106,31 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #52525b;
+  background: #444444;
 }
 
 .dot.online {
   background: var(--emerald);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.55);
 }
 
 /* ============================================================================
-   shadcn Card & Sections
+   shadcn / Vercel Card & Sections
    ============================================================================ */
 .sh-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
 .card-body {
-  padding: 22px;
+  padding: 20px;
 }
 
 .card-footer {
   background: var(--card-footer);
   border-top: 1px solid var(--border);
-  padding: 13px 22px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -154,17 +140,17 @@ body {
 .footer-status {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
 }
 
 .admin-check {
-  color: var(--emerald);
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .footer-muted {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -177,7 +163,7 @@ body {
 .field-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .field-header {
@@ -188,18 +174,18 @@ body {
 }
 
 .field-label {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--fg);
 }
 
 .field-hint {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 
 .field-hint.active-wait {
-  color: #34d399;
+  color: var(--fg);
   font-weight: 500;
 }
 
@@ -211,42 +197,42 @@ body {
   background: var(--input-bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 8px 10px 8px 14px;
+  height: 36px;
+  padding: 0 6px 0 12px;
 }
 
 .ip-value {
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 15px;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.01em;
   color: var(--fg);
   user-select: text;
 }
 
 /* ============================================================================
-   shadcn Controls (Tabs, Buttons, Inputs, Switch)
+   shadcn Controls (Tabs, Buttons, Inputs, Switch — Flat, No Shadows)
    ============================================================================ */
 .sh-tabs-list {
   display: inline-flex;
-  height: 34px;
+  height: 32px;
   align-items: center;
-  background: #121216;
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 3px;
+  padding: 2px;
 }
 
 .sh-tabs-trigger {
   height: 26px;
-  padding: 0 12px;
-  border-radius: 6px;
-  font-size: 12.5px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: color 0.1s ease, background-color 0.1s ease;
   white-space: nowrap;
 }
 
@@ -255,17 +241,16 @@ body {
 }
 
 .sh-tabs-trigger.active {
-  background: #232329;
+  background: #1f1f1f;
   color: var(--fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .sh-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 500;
   border-radius: var(--radius-sm);
@@ -273,19 +258,19 @@ body {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.12s ease;
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
 }
 
 .sh-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   pointer-events: none;
 }
 
 .sh-btn-sm {
-  height: 30px;
-  padding: 0 11px;
+  height: 26px;
+  padding: 0 10px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .sh-btn-primary {
@@ -294,13 +279,13 @@ body {
 }
 
 .sh-btn-primary:hover {
-  background: #e4e4e7;
+  background: #cccccc;
 }
 
 .sh-btn-secondary {
   background: var(--secondary);
   color: var(--fg);
-  border-color: #2c2c35;
+  border-color: var(--border-strong);
 }
 
 .sh-btn-secondary:hover {
@@ -328,28 +313,28 @@ body {
 }
 
 .sh-btn-destructive {
-  background: #7f1d1d;
-  color: #fafafa;
+  background: #2a1215;
+  border-color: #5c2126;
+  color: #f87171;
 }
 
 .sh-btn-destructive:hover {
-  background: #991b1b;
+  background: #3b181c;
 }
 
 .sh-link-btn {
   background: none;
   border: none;
-  color: var(--fg);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
   cursor: pointer;
   padding: 0;
+  transition: color 0.1s ease;
 }
 
 .sh-link-btn:hover {
-  color: #d4d4d8;
+  color: var(--fg);
 }
 
 .sh-btn-icon {
@@ -357,7 +342,7 @@ body {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -368,16 +353,16 @@ body {
 }
 
 .sh-input {
-  height: 38px;
+  height: 36px;
   width: 100%;
   background: var(--input-bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 0 13px;
-  font-size: 13.5px;
+  padding: 0 12px;
+  font-size: 13px;
   color: var(--fg);
   outline: none;
-  transition: border-color 0.12s ease;
+  transition: border-color 0.1s ease;
 }
 
 .sh-input::placeholder {
@@ -385,23 +370,36 @@ body {
 }
 
 .sh-input:focus {
-  border-color: #63636e;
+  border-color: #888888;
 }
 
 .pin-box {
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  letter-spacing: 0.04em;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  letter-spacing: 0.08em;
 }
 
 .sh-select {
-  height: 30px;
+  height: 28px;
   background: var(--input-bg);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--fg);
-  padding: 0 9px;
+  padding: 0 8px;
   font-size: 12px;
   outline: none;
+}
+
+.sh-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 /* Switch */
@@ -415,8 +413,8 @@ body {
 .sh-switch {
   position: relative;
   display: inline-block;
-  width: 34px;
-  height: 19px;
+  width: 32px;
+  height: 18px;
 }
 
 .sh-switch input {
@@ -428,21 +426,21 @@ body {
 .sh-switch-slider {
   position: absolute;
   inset: 0;
-  background-color: #27272d;
+  background-color: #262626;
   border-radius: 999px;
-  transition: 0.15s ease;
+  transition: 0.12s ease;
 }
 
 .sh-switch-slider::before {
   content: "";
   position: absolute;
-  height: 13px;
-  width: 13px;
+  height: 12px;
+  width: 12px;
   left: 3px;
   bottom: 3px;
-  background-color: #a1a1aa;
+  background-color: #888888;
   border-radius: 50%;
-  transition: 0.15s ease;
+  transition: 0.12s ease;
 }
 
 .sh-switch input:checked + .sh-switch-slider {
@@ -450,7 +448,7 @@ body {
 }
 
 .sh-switch input:checked + .sh-switch-slider::before {
-  transform: translateX(15px);
+  transform: translateX(14px);
   background-color: var(--bg);
 }
 
@@ -463,7 +461,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 13px;
+  padding: 9px 12px;
   background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -477,7 +475,7 @@ body {
 }
 
 .item-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--fg);
   white-space: nowrap;
@@ -488,15 +486,15 @@ body {
 .item-sub {
   font-size: 12px;
   color: var(--muted);
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 }
 
 .empty-box {
-  padding: 22px 16px;
+  padding: 18px 14px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
-  border: 1px dashed var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
 
@@ -506,31 +504,31 @@ body {
 .row-gap {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .row-gap-sm {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .stack-lg {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .stack-md {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .stack-xs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .flex-1 {
@@ -538,7 +536,7 @@ body {
 }
 
 .mb-4 {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .mt-1 {
@@ -546,11 +544,11 @@ body {
 }
 
 .pt-3 {
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .mono {
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 }
 
 .truncate {
@@ -571,34 +569,35 @@ body {
 }
 
 .session-header {
-  height: 48px;
-  padding: 0 14px;
+  height: 44px;
+  padding: 0 12px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .header-sep {
   width: 1px;
-  height: 16px;
+  height: 14px;
   background: var(--border-strong);
 }
 
 .session-title {
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .uac-pill {
   font-size: 11px;
   font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid #4d3811;
+  background: #1c1406;
+  color: #f59e0b;
   white-space: nowrap;
 }
 
@@ -633,14 +632,25 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: rgba(9, 9, 11, 0.88);
+  gap: 12px;
+  padding: 28px;
+  text-align: center;
+  background: #000000;
+}
+
+.desktop-overlay h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.desktop-overlay p {
+  max-width: 520px;
 }
 
 .sh-spinner {
-  width: 22px;
-  height: 22px;
-  border: 2px solid #27272d;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #262626;
   border-top-color: var(--fg);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
@@ -653,18 +663,18 @@ body {
 }
 
 .pane-wrap {
-  max-width: 920px;
+  max-width: 900px;
   width: 100%;
   height: 100%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
 }
 
 .pane-card {
   flex: 1;
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -674,30 +684,30 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .path-code {
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 12.5px;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
   background: var(--input-bg);
   border: 1px solid var(--border);
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
 }
 
 .term-output {
   flex: 1;
-  margin-top: 12px;
-  background: #060608;
+  margin-top: 10px;
+  background: #000000;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 12px;
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 12.5px;
-  color: #e4e4e7;
+  padding: 10px;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  color: var(--fg);
   overflow-y: auto;
   white-space: pre-wrap;
   user-select: text;
@@ -705,7 +715,7 @@ body {
 
 .table-scroll {
   flex: 1;
-  margin-top: 10px;
+  margin-top: 8px;
   overflow-y: auto;
 }
 
@@ -713,40 +723,37 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid #16161a;
-  border-radius: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
 }
 
 .table-row:hover {
-  background: #141418;
+  background: #111111;
 }
 
 /* ============================================================================
-   Toast & Modal
+   Toast & Modal (Flat, Hairline Border, Zero Shadow)
    ============================================================================ */
 .sh-toast {
   position: fixed;
-  bottom: 18px;
-  right: 18px;
+  bottom: 16px;
+  right: 16px;
   z-index: 80;
-  background: #16161b;
-  border: 1px solid #2e2e38;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
   color: var(--fg);
-  padding: 9px 13px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .sh-dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -754,21 +761,20 @@ body {
 }
 
 .sh-dialog {
-  width: 360px;
+  width: 340px;
   background: var(--card);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 22px;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
+  padding: 20px;
 }
 
 .pin-hero {
-  margin: 18px 0;
-  padding: 14px;
+  margin: 16px 0;
+  padding: 12px;
   text-align: center;
-  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 30px;
-  font-weight: 700;
+  font-family: "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 26px;
+  font-weight: 600;
   letter-spacing: 8px;
   background: var(--input-bg);
   border: 1px solid var(--border-strong);
@@ -778,8 +784,4 @@ body {
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-}
-
-#sessionMonitorSelect {
-  max-width: 180px;
 }

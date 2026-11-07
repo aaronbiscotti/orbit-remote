@@ -1364,7 +1364,7 @@ function createWindow() {
     height: 580,
     minWidth: 540,
     minHeight: 480,
-    backgroundColor: '#09090b',
+    backgroundColor: '#000000',
     title: 'Orbit',
     icon: path.join(__dirname, 'assets', isWindows ? 'icon.ico' : 'icon.png'),
     autoHideMenuBar: true,
