@@ -7,16 +7,16 @@ const tls = require('tls');
 const https = require('https');
 const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
+const { VideoSession } = require('./video-session');
+const { NativeVideoSession } = require('./native-video-session');
 
-// Enable GPU rasterization and zero-copy canvas acceleration for ultra-low-latency tile rendering
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isWindows = process.platform === 'win32';
 
 let mainWindow = null;
+if(!app.requestSingleInstanceLock())app.exit(0);
+app.on('second-instance',()=>{if(mainWindow&&!mainWindow.isDestroyed()){if(mainWindow.isMinimized())mainWindow.restore();mainWindow.show();mainWindow.focus();}});
 let powerBlockerId = null;
 
 // ============================================================================
@@ -268,6 +268,10 @@ function computePairingCommitment(pin, certSha256Hex, clientId, tokenHashHex) {
     .toLowerCase();
 }
 
+function peerFingerprint(socket) {
+  return String(socket.getPeerCertificate()?.fingerprint256 || '').replace(/:/g, '').toLowerCase();
+}
+
 function computeAuthProof(tokenHashHex, serverNonce, certSha256Hex) {
   const key = Buffer.from(tokenHashHex, 'hex');
   return crypto
@@ -277,61 +281,7 @@ function computeAuthProof(tokenHashHex, serverNonce, certSha256Hex) {
     .toLowerCase();
 }
 
-function writeProtocolFrame(socket, jsonObj, binaryBuffer = null) {
-  if (!socket || socket.destroyed) return;
-  const jsonBytes = Buffer.from(JSON.stringify(jsonObj), 'utf8');
-  const binBytes = binaryBuffer ? Buffer.from(binaryBuffer) : Buffer.alloc(0);
-  const header = Buffer.allocUnsafe(8);
-  header.writeInt32BE(jsonBytes.length, 0);
-  header.writeInt32BE(binBytes.length, 4);
-  socket.write(header);
-  socket.write(jsonBytes);
-  if (binBytes.length > 0) socket.write(binBytes);
-}
-
-class FrameAccumulator {
-  constructor(onFrame) {
-    this.chunks = [];
-    this.totalLength = 0;
-    this.onFrame = onFrame;
-  }
-
-  push(chunk) {
-    this.chunks.push(chunk);
-    this.totalLength += chunk.length;
-    this.drain();
-  }
-
-  drain() {
-    while (this.totalLength >= 8) {
-      const combined = this.chunks.length === 1 ? this.chunks[0] : Buffer.concat(this.chunks, this.totalLength);
-      this.chunks = [combined];
-
-      const jsonLen = combined.readInt32BE(0);
-      const binLen = combined.readInt32BE(4);
-      if (jsonLen <= 0 || jsonLen > 4 * 1024 * 1024 || binLen < 0 || binLen > 32 * 1024 * 1024) {
-        this.chunks = [];
-        this.totalLength = 0;
-        return;
-      }
-
-      const frameTotal = 8 + jsonLen + binLen;
-      if (this.totalLength < frameTotal) return;
-
-      const jsonSlice = combined.subarray(8, 8 + jsonLen);
-      const binSlice = binLen > 0 ? Buffer.from(combined.subarray(8 + jsonLen, frameTotal)) : Buffer.alloc(0);
-
-      const remainder = combined.subarray(frameTotal);
-      this.chunks = remainder.length > 0 ? [remainder] : [];
-      this.totalLength = remainder.length;
-
-      try {
-        const parsed = JSON.parse(jsonSlice.toString('utf8'));
-        this.onFrame(parsed, binSlice);
-      } catch {}
-    }
-  }
-}
+const { writeProtocolFrame, FrameAccumulator } = require('./protocol');
 
 // ============================================================================
 // Windows Host Engine & Admin Loopback API Client
@@ -483,6 +433,40 @@ function runElevatedPowerShellScript(scriptPath) {
 // ============================================================================
 let pairSocket = null;
 let sessionSocket = null;
+let videoSession = null;
+let sessionAddress = null;
+let connectControlSession;
+let controlConnecting;
+let videoOperation = Promise.resolve();
+function queueVideoOperation(fn) {
+  const next = videoOperation.catch(() => {}).then(fn);
+  videoOperation = next;
+  return next;
+}
+async function ensureControlSession() {
+  if(!sessionAddress)throw new Error('No active PC session.');
+  if(sessionSocket && !sessionSocket.destroyed)return;
+  if(!controlConnecting)controlConnecting=connectControlSession({address:sessionAddress,quality:'low',monitor:0,stream:false}).finally(()=>{controlConnecting=null;});
+  await controlConnecting;
+}
+
+async function closeRemoteSession() {
+  if (videoSession) { const old = videoSession; videoSession = null; await old.stop(); }
+  sessionAddress = null;
+  return closeControlSession();
+}
+
+function closeControlSession() {
+  const sock = sessionSocket;
+  sessionSocket = null;
+  if (!sock || sock.destroyed) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { sock.destroy(); resolve(); }, 800);
+    sock.once('close', () => { clearTimeout(timer); resolve(); });
+    writeProtocolFrame(sock, { type: 'privacy_curtain', enabled: false });
+    sock.end();
+  });
+}
 
 function parseHostPort(addressInput) {
   const trimmed = String(addressInput || '').trim();
@@ -529,7 +513,7 @@ function probeSingleComputer(entry, cfg) {
           paired: Boolean(json.paired),
           privilege: json.privilege || 'Standard',
           desktop: json.desktop || 'Default',
-          certSha256: json.paired && !entry.certSha256 ? (json.certSha256 || '') : entry.certSha256
+          certSha256: json.paired && !entry.certSha256 ? peerFingerprint(sock) : entry.certSha256
         });
       }
     });
@@ -557,7 +541,7 @@ function registerIpcHandlers() {
       platform: process.platform,
       isWindows,
       network: getNetworkAddresses(),
-      clientConfig: loadClientConfig()
+      clientConfig: {qualityMode:loadClientConfig().qualityMode}
     };
   });
 
@@ -803,59 +787,60 @@ function registerIpcHandlers() {
     const cfg = loadClientConfig();
     const { host, port } = parseHostPort(address);
     const pin = String(crypto.randomInt(1000, 10000));
+    // A fresh secret for each PC: a wrong or hostile machine only learns a secret that opens nothing else.
+    const tokenHashHex = crypto.randomBytes(32).toString('hex');
+    let certSha256 = '';
+    let done = false;
 
-    pairSocket = tls.connect({ host, port, rejectUnauthorized: false }, () => {
-      pairSocket.setNoDelay(true);
+    const sock = tls.connect({ host, port, rejectUnauthorized: false }, () => {
+      sock.setNoDelay(true);
     });
+    pairSocket = sock;
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('client:pair-Complete', { address, hostname: host, ...result });
+      }
+      sock.destroy();
+      if (pairSocket === sock) pairSocket = null;
+    };
 
     const acc = new FrameAccumulator((json) => {
       if (json.type === 'hello') {
-        const certSha256 = String(json.certSha256 || '').toLowerCase();
-        const commitment = computePairingCommitment(pin, certSha256, cfg.clientId, cfg.tokenHashHex);
-        writeProtocolFrame(pairSocket, {
+        certSha256 = String(json.certSha256 || '').toLowerCase();
+        // Only send the secret to the machine that really holds the certificate it reports.
+        if (!certSha256 || peerFingerprint(sock) !== certSha256) {
+          finish({ paired: false, error: 'This PC did not prove its identity. Pairing stopped.' });
+          return;
+        }
+        const commitment = computePairingCommitment(pin, certSha256, cfg.clientId, tokenHashHex);
+        writeProtocolFrame(sock, {
           type: 'pair_request',
           clientId: cfg.clientId,
           clientName: os.hostname(),
-          tokenHash: cfg.tokenHashHex,
+          tokenHash: tokenHashHex,
           commitment
         });
       } else if (json.type === 'pair_status') {
-        if (json.paired) {
+        if (json.paired && certSha256) {
           const freshCfg = loadClientConfig();
           const pc = freshCfg.computers.find((c) => c.address.toLowerCase() === String(address).toLowerCase());
           if (pc) {
             pc.paired = true;
             pc.online = true;
             pc.name = json.hostname || pc.name;
-            pc.certSha256 = String(json.certSha256 || '').toLowerCase();
+            pc.certSha256 = certSha256;
+            pc.tokenHashHex = tokenHashHex;
             saveClientConfig(freshCfg);
           }
         }
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('client:pair-Complete', {
-            paired: Boolean(json.paired),
-            address,
-            hostname: json.hostname || host,
-            error: json.error || ''
-          });
-        }
-        try {
-          pairSocket.destroy();
-        } catch {}
-        pairSocket = null;
+        finish({ paired: Boolean(json.paired), hostname: json.hostname || host, error: json.error || '' });
       }
     });
 
-    pairSocket.on('data', (chunk) => acc.push(chunk));
-    pairSocket.on('error', (err) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('client:pair-Complete', {
-          paired: false,
-          address,
-          error: err.message
-        });
-      }
-    });
+    sock.on('data', (chunk) => acc.push(chunk));
+    sock.on('error', (err) => finish({ paired: false, error: err.message }));
 
     return { pin, host };
   });
@@ -870,13 +855,8 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('client:connect', (_event, { address, quality, monitor }) => {
-    if (sessionSocket) {
-      try {
-        sessionSocket.destroy();
-      } catch {}
-      sessionSocket = null;
-    }
+  connectControlSession = async ({ address, quality, monitor, stream = true }) => {
+    await closeControlSession();
 
     const cfg = loadClientConfig();
     const pc = cfg.computers.find((c) => c.address.toLowerCase() === String(address).toLowerCase());
@@ -891,6 +871,7 @@ function registerIpcHandlers() {
         sock.setKeepAlive(true, 5000);
       });
       sessionSocket = sock;
+      sessionAddress = address;
 
       const acc = new FrameAccumulator((json, binBuffer) => {
         if (json.type === 'hello') {
@@ -909,14 +890,16 @@ function registerIpcHandlers() {
             return;
           }
 
-          const proof = computeAuthProof(cfg.tokenHashHex, json.nonce, actualFp);
+          // PCs paired before per-PC secrets keep the old shared one until they are paired again.
+          const proof = computeAuthProof(pc?.tokenHashHex || cfg.tokenHashHex, json.nonce, actualFp);
           writeProtocolFrame(sock, {
             type: 'auth',
             clientId: cfg.clientId,
             clientName: os.hostname(),
             proof,
             quality: quality || cfg.qualityMode || 'crisp',
-            monitor: monitor || 0
+            monitor: monitor || 0,
+            stream
           });
           return;
         }
@@ -931,14 +914,19 @@ function registerIpcHandlers() {
         }
 
         if (json.type === 'auth_ok') {
+          // Keep the physical PC usable until the Windows curtain lifecycle is repaired.
+          writeProtocolFrame(sock, { type: 'privacy_curtain', enabled: false });
+          if (pc) { pc.monitors = json.monitors || []; saveClientConfig(cfg); }
           if (!authResolved) {
             authResolved = true;
             resolve({
+              videoExternal: process.platform === 'darwin' && Boolean(pc?.video),
               hostname: json.hostname || host,
               privilege: json.privilege || 'Standard',
               desktop: json.desktop || 'Default',
               secureDesktop: Boolean(json.secureDesktop),
               monitors: json.monitors || [],
+              videoAvailable: Boolean(pc && pc.video),
               privacyCurtain: Boolean(json.privacyCurtain)
             });
           }
@@ -951,6 +939,7 @@ function registerIpcHandlers() {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
         if (json.type === 'frame') {
+          if (videoSession) return;
           mainWindow.webContents.send('client:frame', json, binBuffer);
           return;
         }
@@ -985,31 +974,97 @@ function registerIpcHandlers() {
         }
       });
       sock.on('close', () => {
-        if (sessionSocket === sock) sessionSocket = null;
-        if (mainWindow && !mainWindow.isDestroyed()) {
+        const currentSession = sessionSocket === sock;
+        if (currentSession) sessionSocket = null;
+        if(!authResolved){authResolved=true;reject(new Error('PC connection closed before authentication.'));}
+        if(videoSession)return;
+        if (currentSession && mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('client:disconnected', { reason: 'Connection closed' });
         }
       });
     });
-  });
+  };
 
-  ipcMain.handle('client:disconnect', () => {
-    if (sessionSocket) {
-      try {
-        sessionSocket.destroy();
-      } catch {}
-      sessionSocket = null;
+  ipcMain.handle('client:connect', (_event, options) => queueVideoOperation(async () => {
+    await closeRemoteSession();
+    const pc = loadClientConfig().computers.find(pc => pc.address === options.address);
+    // A paired GPU PC can launch without authenticating the legacy capture engine.
+    if (process.platform === 'darwin' && pc?.video && pc.monitors?.length) {
+      sessionAddress = options.address;
+      return { hostname:pc.name, monitors:pc.monitors, videoAvailable:true, videoExternal:true };
     }
-    return { ok: true };
-  });
+    const result = await connectControlSession(options);
+    if (result.videoExternal) await closeControlSession();
+    return result;
+  }));
 
-  ipcMain.on('client:send', (_event, payload) => {
+  ipcMain.handle('client:disconnect', () => queueVideoOperation(async () => {
+    await closeRemoteSession();
+    return { ok: true };
+  }));
+
+  ipcMain.handle('video:start', (_event, options = {}) => queueVideoOperation(async () => {
+    if (!sessionAddress) throw new Error('Connect to the PC first.');
+    if (videoSession) { const old = videoSession; videoSession = null; await old.stop(); }
+    const cfg = loadClientConfig();
+    const pc = cfg.computers.find(pc => pc.address === sessionAddress);
+    if (!pc?.video) throw new Error('GPU streaming is not paired for this PC.');
+    if(['crisp','balanced','low'].includes(options.quality)){cfg.qualityMode=options.quality;saveClientConfig(cfg);}
+    const bitrate = { crisp: 25000, balanced: 12000, low: 6000 }[options.quality] || pc.video.bitrate;
+    if (process.platform === 'darwin') {
+      await closeControlSession();
+      const current = videoSession = new NativeVideoSession({
+        executable:'/Applications/Moonlight.app/Contents/MacOS/Moonlight',
+        profile:{...pc.video, bitrate, width:options.width, height:options.height}
+      });
+      current.on('status', status => {
+        if (videoSession === current && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('video:status', status);
+      });
+      try { return await current.start(); }
+      catch (error) { await current.stop(); if(videoSession === current) videoSession = null; throw error; }
+    }
+    const helper = app.isPackaged ? path.join(process.resourcesPath, 'video-engine', 'orbit-video-bridge') : path.join(getRepoOrResourceRoot(), 'work/video-bridge-build/orbit-video-bridge');
+    const current = videoSession = new VideoSession({helper, identityPath:path.join(app.getPath('userData'),'video-identity.json'),profile:{...pc.video,bitrate,width:Math.max(640,Math.min(3840,Math.round((Number(options.width)||1920)/2)*2)),height:Math.max(480,Math.min(2160,Math.round((Number(options.height)||1080)/2)*2)),codec:options.codec==='hevc'?'hevc':'h264'}});
+    const send = (name, ...args) => { if(videoSession===current && mainWindow && !mainWindow.isDestroyed())mainWindow.webContents.send(name,...args); };
+    current.on('packet',(meta, data)=>send('video:packet',meta,data));
+    current.on('status',status=>{send('video:status',status);if(status.type==='connected' && Number.isInteger(options.monitor))current.selectMonitor(options.monitor);});
+    current.on('failure',error=>send('video:status',{type:'error',message:error}));
+    try { const info = await current.start();await closeControlSession();return info; } catch(error) { current.stop(); if(videoSession===current)videoSession=null; throw error; }
+  }));
+  ipcMain.handle('client:tab', async (_event, tab) => {
+    if(!videoSession || !sessionAddress)return;
+    if(tab==='desktop'){if(controlConnecting)await controlConnecting;await closeControlSession();return;}
+    if(!sessionSocket || sessionSocket.destroyed){
+      if(!controlConnecting)controlConnecting=connectControlSession({address:sessionAddress,quality:'low',monitor:0,stream:false}).finally(()=>{controlConnecting=null;});
+      await controlConnecting;
+    }
+  });
+  ipcMain.handle('video:focus', async () => {
+    if (!videoSession?.external || !videoSession.child) return { running:false };
+    const pid = videoSession.child.pid;
+    const helper = path.join(app.isPackaged ? process.resourcesPath : path.join(getRepoOrResourceRoot(),'dist'), 'video-engine', 'orbit-focus-player');
+    // A failed focus must not restart a working stream; the check above already catches a closed player.
+    return new Promise(resolve => execFile(helper, [String(pid)], () => resolve({ running: true })));
+  });
+  ipcMain.handle('video:monitor', (_event, index) => { if(!videoSession || videoSession.external)throw new Error('Switch monitors in the stream window using Ctrl+Option+Shift+F1 or F2.');videoSession.selectMonitor(index);return {ok:true}; });
+  ipcMain.on('video:ack', (_event, id) => videoSession?.ack?.(id));
+  ipcMain.on('video:keyframe', () => videoSession?.command?.('I'));
+  ipcMain.on('video:metrics', (_event, metrics) => { console.log('ORBIT_VIDEO', JSON.stringify(metrics)); });
+
+  ipcMain.on('client:send', async (_event, payload) => {
+    if (videoSession && ['mouse','key'].includes(payload.type)) { videoSession.input(payload); return; }
+
+    if(videoSession && (!sessionSocket || sessionSocket.destroyed) && payload.type==='sas') {
+      try { await ensureControlSession(); }
+      catch(error) {mainWindow?.webContents.send('client:event',{type:'error',error:error.message});return;}
+    }
     if (sessionSocket && !sessionSocket.destroyed) {
       writeProtocolFrame(sessionSocket, payload);
     }
   });
 
-  ipcMain.handle('client:sync-clipboard-to-pc', () => {
+  ipcMain.handle('client:sync-clipboard-to-pc', async () => {
+    await ensureControlSession();
     const text = clipboard.readText();
     if (text && sessionSocket && !sessionSocket.destroyed) {
       writeProtocolFrame(sessionSocket, { type: 'clipboard_set', text });
@@ -1059,8 +1114,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false,
-      backgroundThrottling: false
+      nodeIntegration: false
     }
   });
 
@@ -1095,8 +1149,15 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  if (!videoSession?.external) void closeRemoteSession();
   if (powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId)) {
     powerSaveBlocker.stop(powerBlockerId);
   }
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', (event) => {
+  if ((!sessionSocket || sessionSocket.destroyed) && !videoSession) return;
+  event.preventDefault();
+  queueVideoOperation(closeRemoteSession).finally(() => app.quit());
 });

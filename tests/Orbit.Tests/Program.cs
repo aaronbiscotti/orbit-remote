@@ -82,7 +82,7 @@ using (var syntheticScreen = new Bitmap(384, 256))
         g.Clear(Color.FromArgb(16, 18, 24));
     }
     var firstDelta = captureEngine.ComputeDeltaFromBitmap(syntheticScreen, "Default", false, "SYSTEM", 100, 100, "crisp", forceFullFrame: true);
-    Check(firstDelta.FullFrame && firstDelta.Tiles.Count == 6 && firstDelta.Payload.Length > 0, "Initial full frame must encode all 6 (3x2) 128x128 tiles.");
+    Check(firstDelta.FullFrame && firstDelta.Tiles.Count == 2 && firstDelta.Payload.Length > 0, "Initial full frame must encode all 2 (2x1) 256x256 tiles.");
 
     var staticDelta = captureEngine.ComputeDeltaFromBitmap(syntheticScreen, "Default", false, "SYSTEM", 100, 100, "crisp", forceFullFrame: false);
     Check(!staticDelta.FullFrame && staticDelta.Tiles.Count == 0 && staticDelta.Payload.Length == 0, "Static screen must produce 0 dirty tiles and 0 bytes (zero idle bitrate).");
@@ -236,7 +236,7 @@ try
         var (frameDoc, frameBin) = await TakeoverFraming.ReadFrameAsync(sessionSsl, CancellationToken.None);
         Check(frameDoc != null && frameDoc.RootElement.GetProperty("type").GetString() == "frame", "Authenticated session must receive initial desktop tile frame.");
         Check(frameDoc!.RootElement.GetProperty("secureDesktop").GetBoolean() && frameDoc.RootElement.GetProperty("desktop").GetString() == "Winlogon", "Frame metadata must report UAC Secure Desktop (Winlogon) state.");
-        Check(frameBin.Length > 0 && frameDoc.RootElement.GetProperty("tiles").GetArrayLength() == 2, "256x128 screen must arrive as 2 dirty tiles.");
+        Check(frameBin.Length > 0 && frameDoc.RootElement.GetProperty("tiles").GetArrayLength() == 1, "256x128 screen must arrive as 1 dirty tile.");
         var seq = frameDoc.RootElement.GetProperty("seq").GetInt64();
         frameDoc.Dispose();
 

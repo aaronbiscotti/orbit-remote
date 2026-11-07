@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(orbit-video-bridge C)
+set(CMAKE_C_STANDARD 11)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+add_subdirectory(../../vendor/moonlight-common-c moonlight)
+add_executable(orbit-video-bridge main.c)
+target_link_libraries(orbit-video-bridge PRIVATE moonlight-common-c)

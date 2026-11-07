@@ -32,7 +32,7 @@ public sealed record CapturedFrameDelta(
 /// </summary>
 public sealed unsafe class DesktopCaptureEngine : IDisposable
 {
-    public const int TileSize = 128;
+    public const int TileSize = 256;
 
     private const int SRCCOPY = 0x00CC0020;
     private const int CAPTUREBLT = 0x40000000;

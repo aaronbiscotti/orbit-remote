@@ -9,3 +9,5 @@ node_modules/
 .vs/
 .idea/
 .DS_Store
+
+work/

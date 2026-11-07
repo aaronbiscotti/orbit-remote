@@ -38,15 +38,16 @@ public static class TakeoverFraming
     {
         var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(jsonObject);
         var binBytes = binaryPayload ?? Array.Empty<byte>();
-        var header = new byte[8];
-        BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(0, 4), jsonBytes.Length);
-        BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4, 4), binBytes.Length);
+        // Header and JSON in one write: one TLS record and one packet for small messages.
+        var head = new byte[8 + jsonBytes.Length];
+        BinaryPrimitives.WriteInt32BigEndian(head.AsSpan(0, 4), jsonBytes.Length);
+        BinaryPrimitives.WriteInt32BigEndian(head.AsSpan(4, 4), binBytes.Length);
+        jsonBytes.CopyTo(head, 8);
 
         await writeLock.WaitAsync(ct);
         try
         {
-            await stream.WriteAsync(header, ct);
-            await stream.WriteAsync(jsonBytes, ct);
+            await stream.WriteAsync(head, ct);
             if (binBytes.Length > 0)
             {
                 await stream.WriteAsync(binBytes, ct);
@@ -750,6 +751,14 @@ public sealed class TakeoverServer : IAsyncDisposable
         var lastAckedSeq = 0L;
         var lastSentSeq = 0L;
         var lastAckTime = DateTime.UtcNow;
+        long boostUntil = 0;
+        var buttonsHeld = 0;
+        // File and process requests run one at a time, in order, off the reader loop,
+        // so input and frame acks never wait behind a folder listing or a download.
+        var slowWork = Task.CompletedTask;
+        void RunInBackground(Func<Task> work) =>
+            slowWork = slowWork.ContinueWith(async _ => { try { await work(); } catch { } }, sessionToken,
+                TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
         var shellCwd = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         Task? streamLoopTask = null;
 
@@ -845,6 +854,8 @@ public sealed class TakeoverServer : IAsyncDisposable
                             selectedQuality = q;
                         if (root.TryGetProperty("monitor", out var mProp) && mProp.TryGetInt32(out var mIdx))
                             selectedMonitor = mIdx;
+                        // Connections opened only for files, terminal or processes ask the PC not to grab the screen.
+                        var wantsStream = !(root.TryGetProperty("stream", out var stProp) && stProp.ValueKind == JsonValueKind.False);
 
                         if (!VerifyClientAuthProof(clientId, serverNonce, proofHex))
                         {
@@ -874,19 +885,21 @@ public sealed class TakeoverServer : IAsyncDisposable
                         }, null, writeLock, sessionToken);
 
                         forceFullFrame = true;
-                        streamLoopTask = Task.Run(async () =>
+                        if (wantsStream) streamLoopTask = Task.Run(async () =>
                         {
                             using var captureEngine = new DesktopCaptureEngine();
                             while (!sessionToken.IsCancellationRequested)
                             {
                                 try
                                 {
-                                    // Backpressure control: wait until the client acknowledges the previous frame (or 2s recovery timeout)
-                                    var canSend = lastAckedSeq >= lastSentSeq || (DateTime.UtcNow - lastAckTime).TotalMilliseconds > 2000;
+                                    var started = Environment.TickCount64;
+                                    // Backpressure: at most two frames awaiting the client's ack (or a send after 2 s with no ack).
+                                    var canSend = lastSentSeq - lastAckedSeq < 2 || (DateTime.UtcNow - lastAckTime).TotalMilliseconds > 2000;
                                     if (canSend)
                                     {
+                                        // Clear the request only when it was seen, so one arriving right now is not lost.
                                         var reqFull = forceFullFrame;
-                                        forceFullFrame = false;
+                                        if (reqFull) forceFullFrame = false;
                                         var delta = CustomCaptureProvider != null
                                             ? CustomCaptureProvider(selectedMonitor, selectedQuality, reqFull)
                                             : captureEngine.CaptureNextDelta(selectedMonitor, selectedQuality, reqFull);
@@ -921,8 +934,11 @@ public sealed class TakeoverServer : IAsyncDisposable
                                         }
                                     }
 
-                                    // Wait up to 33ms (~30Hz dirty check), waking immediately on user input or frame_ack
-                                    await inputWakeSignal.WaitAsync(33, sessionToken);
+                                    // Check about 30 times a second, or every 8 ms for a moment after a key, click or scroll
+                                    // so the app's repaint shows up quickly. Count from the start of this capture, not its end.
+                                    var interval = Environment.TickCount64 < boostUntil ? 8 : 33;
+                                    var wait = (int)Math.Max(1, interval - (Environment.TickCount64 - started));
+                                    await inputWakeSignal.WaitAsync(wait, sessionToken);
                                 }
                                 catch (OperationCanceledException) { break; }
                                 catch { await Task.Delay(100, sessionToken); }
@@ -956,7 +972,14 @@ public sealed class TakeoverServer : IAsyncDisposable
                             var dx = root.TryGetProperty("deltaX", out var dxp) && dxp.TryGetInt32(out var dxv) ? dxv : 0;
                             var dy = root.TryGetProperty("deltaY", out var dyp) && dyp.TryGetInt32(out var dyv) ? dyv : 0;
                             DesktopInputInjector.InjectMouse(selectedMonitor, action, x, y, button, dx, dy);
-                            SignalWake(inputWakeSignal);
+                            if (action == "down") buttonsHeld++;
+                            else if (action is "up" or "release") buttonsHeld = Math.Max(0, buttonsHeld - 1);
+                            // Plain hover moves don't trigger a screen grab; clicks, drags and scrolls do, then re-check quickly.
+                            if (action != "move" || buttonsHeld > 0)
+                            {
+                                boostUntil = Environment.TickCount64 + 100;
+                                SignalWake(inputWakeSignal);
+                            }
                             break;
                         }
 
@@ -969,6 +992,7 @@ public sealed class TakeoverServer : IAsyncDisposable
                             var shift = root.TryGetProperty("shift", out var sp) && sp.GetBoolean();
                             var win = root.TryGetProperty("win", out var wp) && wp.GetBoolean();
                             DesktopInputInjector.InjectKey(action, vk, ctrl, alt, shift, win);
+                            boostUntil = Environment.TickCount64 + 100;
                             SignalWake(inputWakeSignal);
                             break;
                         }
@@ -977,6 +1001,7 @@ public sealed class TakeoverServer : IAsyncDisposable
                         {
                             var text = root.TryGetProperty("text", out var tp) ? tp.GetString() ?? "" : "";
                             DesktopInputInjector.InjectText(text);
+                            boostUntil = Environment.TickCount64 + 100;
                             SignalWake(inputWakeSignal);
                             break;
                         }
@@ -1063,76 +1088,85 @@ public sealed class TakeoverServer : IAsyncDisposable
                         case "fs_list":
                         {
                             var reqPath = root.TryGetProperty("path", out var pp) ? pp.GetString() ?? "" : "";
-                            var listing = RemoteOsController.ListDirectory(reqPath);
-                            await TakeoverFraming.WriteFrameAsync(ssl, new
+                            RunInBackground(async () =>
                             {
-                                type = "fs_list_result",
-                                path = listing.CurrentPath,
-                                parent = listing.ParentPath,
-                                error = listing.Error ?? "",
-                                entries = listing.Entries.Select(e => new
+                                var listing = RemoteOsController.ListDirectory(reqPath);
+                                await TakeoverFraming.WriteFrameAsync(ssl, new
                                 {
-                                    name = e.Name,
-                                    path = e.Path,
-                                    isDir = e.IsDirectory,
-                                    size = e.Size,
-                                    modified = e.Modified
-                                })
-                            }, null, writeLock, sessionToken);
+                                    type = "fs_list_result",
+                                    path = listing.CurrentPath,
+                                    parent = listing.ParentPath,
+                                    error = listing.Error ?? "",
+                                    entries = listing.Entries.Select(e => new
+                                    {
+                                        name = e.Name,
+                                        path = e.Path,
+                                        isDir = e.IsDirectory,
+                                        size = e.Size,
+                                        modified = e.Modified
+                                    })
+                                }, null, writeLock, sessionToken);
+                            });
                             break;
                         }
 
                         case "fs_download":
                         {
                             var reqPath = root.TryGetProperty("path", out var pp) ? pp.GetString() ?? "" : "";
-                            try
+                            RunInBackground(async () =>
                             {
-                                var bytes = RemoteOsController.ReadFileBytes(reqPath);
-                                await TakeoverFraming.WriteFrameAsync(ssl, new
+                                try
                                 {
-                                    type = "fs_download_result",
-                                    ok = true,
-                                    name = Path.GetFileName(reqPath),
-                                    path = reqPath
-                                }, bytes, writeLock, sessionToken);
-                            }
-                            catch (Exception ex)
-                            {
-                                await TakeoverFraming.WriteFrameAsync(ssl, new
+                                    var bytes = RemoteOsController.ReadFileBytes(reqPath);
+                                    await TakeoverFraming.WriteFrameAsync(ssl, new
+                                    {
+                                        type = "fs_download_result",
+                                        ok = true,
+                                        name = Path.GetFileName(reqPath),
+                                        path = reqPath
+                                    }, bytes, writeLock, sessionToken);
+                                }
+                                catch (Exception ex)
                                 {
-                                    type = "fs_download_result",
-                                    ok = false,
-                                    name = Path.GetFileName(reqPath),
-                                    path = reqPath,
-                                    error = ex.Message
-                                }, null, writeLock, sessionToken);
-                            }
+                                    await TakeoverFraming.WriteFrameAsync(ssl, new
+                                    {
+                                        type = "fs_download_result",
+                                        ok = false,
+                                        name = Path.GetFileName(reqPath),
+                                        path = reqPath,
+                                        error = ex.Message
+                                    }, null, writeLock, sessionToken);
+                                }
+                            });
                             break;
                         }
 
                         case "fs_upload":
                         {
                             var destPath = root.TryGetProperty("path", out var pp) ? pp.GetString() ?? "" : "";
-                            try
+                            RunInBackground(async () =>
                             {
-                                RemoteOsController.WriteFileBytes(destPath, binaryPayload);
-                                await TakeoverFraming.WriteFrameAsync(ssl, new
+                                try
                                 {
-                                    type = "fs_upload_result",
-                                    ok = true,
-                                    path = destPath
-                                }, null, writeLock, sessionToken);
-                            }
-                            catch (Exception ex)
-                            {
-                                await TakeoverFraming.WriteFrameAsync(ssl, new
+                                    RemoteOsController.WriteFileBytes(destPath, binaryPayload);
+                                    await TakeoverFraming.WriteFrameAsync(ssl, new
+                                    {
+                                        type = "fs_upload_result",
+                                        ok = true,
+                                        path = destPath
+                                    }, null, writeLock, sessionToken);
+                                }
+                                catch (Exception ex)
                                 {
-                                    type = "fs_upload_result",
-                                    ok = false,
-                                    path = destPath,
-                                    error = ex.Message
-                                }, null, writeLock, sessionToken);
-                            }
+                                    await TakeoverFraming.WriteFrameAsync(ssl, new
+                                    {
+                                        type = "fs_upload_result",
+                                        ok = false,
+                                        path = destPath,
+                                        error = ex.Message
+                                    }, null, writeLock, sessionToken);
+                                }
+                            });
                             break;
                         }
 
@@ -1153,19 +1187,22 @@ public sealed class TakeoverServer : IAsyncDisposable
 
                         case "proc_list":
                         {
-                            var procs = RemoteOsController.ListProcesses();
-                            await TakeoverFraming.WriteFrameAsync(ssl, new
+                            RunInBackground(async () =>
                             {
-                                type = "proc_list_result",
-                                processes = procs.Select(p => new
+                                var procs = RemoteOsController.ListProcesses();
+                                await TakeoverFraming.WriteFrameAsync(ssl, new
                                 {
-                                    pid = p.Id,
-                                    name = p.Name,
-                                    memoryMb = p.MemoryMb,
-                                    elevated = p.Elevated,
-                                    title = p.WindowTitle
-                                })
-                            }, null, writeLock, sessionToken);
+                                    type = "proc_list_result",
+                                    processes = procs.Select(p => new
+                                    {
+                                        pid = p.Id,
+                                        name = p.Name,
+                                        memoryMb = p.MemoryMb,
+                                        elevated = p.Elevated,
+                                        title = p.WindowTitle
+                                    })
+                                }, null, writeLock, sessionToken);
+                            });
                             break;
                         }
 

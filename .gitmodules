@@ -1,3 +1,6 @@
 [submodule "vendor/moonlight"]
 	path = vendor/moonlight
 	url = https://github.com/moonlight-stream/moonlight-qt.git
+[submodule "vendor/moonlight-common-c"]
+	path = vendor/moonlight-common-c
+	url = https://github.com/moonlight-stream/moonlight-common-c.git

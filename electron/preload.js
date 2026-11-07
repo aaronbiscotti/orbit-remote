@@ -29,6 +29,24 @@ contextBridge.exposeInMainWorld('orbit', {
   syncClipboardToPc: () => ipcRenderer.invoke('client:sync-clipboard-to-pc'),
   uploadFileDialog: (remoteDir) => ipcRenderer.invoke('client:upload-file-dialog', { remoteDir }),
 
+  sessionTab: (tab) => ipcRenderer.invoke('client:tab', tab),
+  focusVideo: () => ipcRenderer.invoke('video:focus'),
+  startVideo: (options) => ipcRenderer.invoke('video:start', options),
+  selectVideoMonitor: (index) => ipcRenderer.invoke('video:monitor', index),
+  ackVideo: (id) => ipcRenderer.send('video:ack', id),
+  requestVideoKeyframe: () => ipcRenderer.send('video:keyframe'),
+  videoMetrics: (metrics) => ipcRenderer.send('video:metrics', metrics),
+  onVideoPacket: (callback) => {
+    const handler = (_event, meta, data) => callback(meta, data);
+    ipcRenderer.on('video:packet', handler);
+    return () => ipcRenderer.removeListener('video:packet', handler);
+  },
+  onVideoStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('video:status', handler);
+    return () => ipcRenderer.removeListener('video:status', handler);
+  },
+
   // Event Subscriptions
   onFrame: (callback) => {
     const handler = (_event, meta, binBuffer) => callback(meta, binBuffer);

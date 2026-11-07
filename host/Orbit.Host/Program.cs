@@ -4,55 +4,22 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 
 namespace Orbit.Host;
 
-public partial class App : Application
+// Headless entry point: the Windows service (--service), otherwise the takeover agent.
+public static class Program
 {
-    protected override void OnStartup(StartupEventArgs e)
+    public static void Main(string[] args)
     {
-        DispatcherUnhandledException += (_, args) => {
-            MessageBox.Show(args.Exception.Message, "Orbit", MessageBoxButton.OK, MessageBoxImage.Warning);
-            args.Handled = true;
-        };
-        base.OnStartup(e);
-
         var exePath = Environment.ProcessPath ?? AppContext.BaseDirectory;
-        var exeName = Path.GetFileNameWithoutExtension(exePath);
-
-        if (e.Args.Any(a => string.Equals(a, "--service", StringComparison.OrdinalIgnoreCase)))
+        if (args.Any(a => string.Equals(a, "--service", StringComparison.OrdinalIgnoreCase)))
         {
-            ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    NativeWindowsService.Run(ct => RunSystemServiceLoopAsync(exePath, ct));
-                }
-                finally
-                {
-                    Dispatcher.Invoke(() => Shutdown(0));
-                }
-            });
+            NativeWindowsService.Run(ct => RunSystemServiceLoopAsync(exePath, ct));
             return;
         }
-
-        var isSessionAgent = e.Args.Any(a => string.Equals(a, "--session-agent", StringComparison.OrdinalIgnoreCase))
-            || string.Equals(exeName, "sunshine", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(exeName, "orbit-agent", StringComparison.OrdinalIgnoreCase);
-
-        if (isSessionAgent)
-        {
-            ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            var configRoot = ResolveAgentConfigRoot(e.Args);
-            _ = Task.Run(() => RunSessionAgentAsync(configRoot));
-            return;
-        }
-
-        var window = new MainWindow();
-        MainWindow = window;
-        window.Show();
+        // Orbit starts the agent as sunshine.exe "<config>"; the service starts it with --session-agent "<config>".
+        RunSessionAgentAsync(ResolveAgentConfigRoot(args)).GetAwaiter().GetResult();
     }
 
     private static string ResolveAgentConfigRoot(string[] args)

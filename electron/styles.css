@@ -771,3 +771,7 @@ body {
   display: flex;
   justify-content: flex-end;
 }
+
+#sessionMonitorSelect {
+  max-width: 180px;
+}

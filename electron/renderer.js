@@ -3,9 +3,16 @@
   let isWindows = false;
   let currentMode = 'host';
   let inSession = false;
-  let privacyCurtainEnabled = false;
+  let video = null;
+  let gpuSession = false;
+  let externalVideo = false;
+  let sessionMonitors = [];
+  const heldKeys = new Set();
+  const heldButtons = new Set();
   let remoteDesktopWidth = 1920;
   let remoteDesktopHeight = 1080;
+  let selectedMonitor = 0;
+  let sessionGeneration = 0;
   let currentFileParentPath = '';
   let currentFilePath = '';
   let pendingPairingsList = [];
@@ -207,7 +214,7 @@
     const empty = $('emptyPcState');
     grid.innerHTML = '';
 
-    const list = res.computers || [];
+    const list = res;
     if (list.length === 0) {
       empty.classList.remove('hidden');
       return;
@@ -316,7 +323,7 @@
 
   orbit.onPairComplete((data) => {
     $('pairPinModal').classList.add('hidden');
-    if (data.ok) {
+    if (data.paired) {
       showBanner('Paired! Click Connect to take over your PC.');
       refreshPcCards();
     } else {
@@ -329,6 +336,9 @@
   // ============================================================================
   async function startTakeoverSession(address, label) {
     try {
+      sessionGeneration++;
+      selectedMonitor = 0;
+      $('sessionMonitorSelect').innerHTML = '';
       const quality = $('sessionQualitySelect').value || 'crisp';
       $('desktopLoadingOverlay').classList.remove('hidden');
 
@@ -340,6 +350,24 @@
       switchSessionTab('desktop');
 
       const res = await orbit.connectToPc(address, quality, 0);
+      const monitors = res.monitors || [];
+      sessionMonitors = monitors;
+      for (const monitor of monitors) {
+        const option = document.createElement('option');
+        option.value = String(monitor.Index);
+        option.textContent = `${monitor.Name} · ${monitor.Width}×${monitor.Height}${monitor.Primary ? ' (Main)' : ''}`;
+        $('sessionMonitorSelect').appendChild(option);
+      }
+      externalVideo = Boolean(res.videoExternal);
+      if (res.videoAvailable) {
+        gpuSession = true;
+        selectedMonitor = monitors.find(m => m.Primary)?.Index || 0;
+        await startGpuVideo();
+      }
+      $('sessionMonitorSelect').value = String(selectedMonitor);
+      $('sessionMonitorSelect').disabled = externalVideo || monitors.length < 2;
+      $('sessionMonitorSelect').classList.toggle('hidden', externalVideo);
+      $('fitWindowBtn').classList.toggle('hidden', externalVideo);
       updateRemotePrivilegeBadges(res.privilege || 'Standard', res.desktop || 'Default');
       $('desktopViewport').focus();
     } catch (err) {
@@ -347,6 +375,47 @@
       showBanner(err.message || 'Connection failed.');
     }
   }
+
+  async function startGpuVideo() {
+    if(video)video.close();
+    if (externalVideo) {
+      $('desktopLoadingOverlay').classList.add('hidden');
+      canvas.classList.add('hidden');
+      $('externalStreamPanel').classList.remove('hidden');
+      $('externalStreamStatus').textContent = 'Opening stream window…';
+      $('videoStats').classList.add('hidden');
+      await orbit.startVideo({quality:$('sessionQualitySelect').value, width:1920, height:1080});
+      $('externalStreamStatus').textContent = 'Your desktop opens in a separate Moonlight window.';
+      return;
+    }
+    const hevc = await VideoDecoder.isConfigSupported({codec:'hev1.1.6.L153.B0',hardwareAcceleration:'prefer-hardware',optimizeForLatency:true}).catch(()=>({supported:false}));
+    const codec=hevc.supported?'hevc':'h264';
+    video = new OrbitVideo(canvas, {
+      frame(width,height) {
+        remoteDesktopWidth=width;remoteDesktopHeight=height;
+        canvas.style.cursor='none';
+        $('desktopLoadingOverlay').classList.add('hidden');
+      },
+      error(message) { showBanner(message); },
+      stats(stats) {
+        $('videoStats').classList.remove('hidden');
+        $('videoStats').textContent=`${stats.renderedFps} fps · ${stats.networkMs} ms`;
+        $('videoStats').title=`Target 120 fps · network jitter ${stats.jitterMs} ms · decode ${stats.decodeMs} ms · host ${stats.hostMs} ms`;
+      }
+    }, codec);
+    const monitor=sessionMonitors.find(m=>m.Index===selectedMonitor);
+    const native=$('sessionQualitySelect').value==='crisp';
+    try { await orbit.startVideo({quality:$('sessionQualitySelect').value,codec,monitor:selectedMonitor,width:native?monitor?.Width:1920,height:native?monitor?.Height:1080}); }
+    catch(error) { video.close();video=null;throw error; }
+  }
+
+  $('openStreamWindowBtn').addEventListener('click', async () => {
+    try { const result = await orbit.focusVideo(); if(!result.running) await startGpuVideo(); }
+    catch(error) { $('externalStreamStatus').textContent = error.message; }
+  });
+  orbit.onVideoStatus(status => {
+    if(externalVideo && status.type === 'closed') $('externalStreamStatus').textContent = status.message;
+  });
 
   function updateRemotePrivilegeBadges(privilege, desktop) {
     const isUac =
@@ -356,8 +425,14 @@
   }
 
   function exitSessionUi() {
+    if(video){video.close();video=null;}
+    externalVideo=false;canvas.classList.remove('hidden');$('externalStreamPanel').classList.add('hidden');
+    $('sessionMonitorSelect').classList.remove('hidden');$('fitWindowBtn').classList.remove('hidden');
+    gpuSession=false;canvas.style.cursor='';$('videoStats').classList.add('hidden');
+    if(moveTimer)clearTimeout(moveTimer);moveTimer=null;pendingMove=null;
+    sessionGeneration++;
     inSession = false;
-    privacyCurtainEnabled = false;
+    skippedSeq = 0;
     $('curtainBtn').textContent = 'Blank PC';
 
     $('sessionView').classList.add('hidden');
@@ -379,7 +454,7 @@
     }
   });
 
-  function switchSessionTab(tabName) {
+  async function switchSessionTab(tabName) {
     document.querySelectorAll('.session-tab').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
@@ -388,14 +463,17 @@
     $('tabFiles').classList.toggle('hidden', tabName !== 'files');
     $('tabProcesses').classList.toggle('hidden', tabName !== 'processes');
 
+    if(video)video.setVisible(tabName==='desktop'&&!document.hidden);
+    if(gpuSession){try{await orbit.sessionTab(tabName);}catch(error){showBanner(error.message);return;}}
     if (tabName === 'desktop') {
       $('desktopViewport').focus();
+      resumeTiles();
     } else if (tabName === 'terminal') {
       $('termInput').focus();
     } else if (tabName === 'files' && !currentFilePath) {
-      orbit.send({ type: 'file_list', path: '' });
+      orbit.send({ type: 'fs_list', path: '' });
     } else if (tabName === 'processes') {
-      orbit.send({ type: 'process_list' });
+      orbit.send({ type: 'proc_list' });
     }
   }
 
@@ -406,53 +484,73 @@
   // ============================================================================
   // High-Performance Dirty-Tile Canvas Rendering
   // ============================================================================
-  orbit.onFrame(async (meta, binBuffer) => {
-    $('desktopLoadingOverlay').classList.add('hidden');
-
-    if (meta.width && meta.height) {
-      if (canvas.width !== meta.width || canvas.height !== meta.height) {
-        canvas.width = meta.width;
-        canvas.height = meta.height;
-        remoteDesktopWidth = meta.width;
-        remoteDesktopHeight = meta.height;
-      }
-    }
-
-    if (meta.privilege || meta.desktop) {
-      updateRemotePrivilegeBadges(meta.privilege || 'Standard', meta.desktop || 'Default');
-    }
-
-    const tiles = meta.tiles || [];
-    if (tiles.length === 0 || !binBuffer) return;
-
-    const u8 = binBuffer instanceof Uint8Array ? binBuffer : new Uint8Array(binBuffer);
-    const decodeJobs = [];
-
-    for (let i = 0; i < tiles.length; i++) {
-      const t = tiles[i];
-      const slice = u8.subarray(t.offset, t.offset + t.length);
-      const mime = t.format === 'png' ? 'image/png' : 'image/jpeg';
-      const blob = new Blob([slice], { type: mime });
-      decodeJobs.push(
-        createImageBitmap(blob).then((bmp) => ({
-          bmp,
-          x: t.x,
-          y: t.y,
-          w: t.w,
-          h: t.h
-        }))
-      );
-    }
-
-    try {
-      const decoded = await Promise.all(decodeJobs);
-      for (let i = 0; i < decoded.length; i++) {
-        const d = decoded[i];
-        ctx.drawImage(d.bmp, d.x, d.y, d.w, d.h);
-        d.bmp.close();
-      }
-    } catch {}
+  let skippedSeq = 0;
+  // Acknowledge what was skipped and ask for a full frame, since the canvas missed those changes.
+  function resumeTiles() {
+    if (!skippedSeq || !inSession || gpuSession) return;
+    orbit.send({ type: 'frame_ack', seq: skippedSeq });
+    skippedSeq = 0;
+    orbit.send({ type: 'display_config', monitor: selectedMonitor });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !$('tabDesktop').classList.contains('hidden')) resumeTiles();
   });
+
+  // The PC may have two frames in flight. Draw them strictly in arrival order, since each holds only what changed.
+  let drawQueue = Promise.resolve();
+  orbit.onFrame((meta, binBuffer) => { drawQueue = drawQueue.then(() => drawFrame(meta, binBuffer)); });
+  async function drawFrame(meta, binBuffer) {
+    if(gpuSession)return;
+    // Nobody is looking: skip decoding and hold the ack, so the PC stops sending until the desktop is shown again.
+    if (document.hidden || $('tabDesktop').classList.contains('hidden')) { skippedSeq = Math.max(skippedSeq, meta.seq); return; }
+    const generation = sessionGeneration;
+    const decoded = [];
+    try {
+      const { screenW, screenH } = meta;
+      if (!Number.isInteger(screenW) || screenW <= 0 || !Number.isInteger(screenH) || screenH <= 0) {
+        throw new Error('The host sent invalid display dimensions.');
+      }
+      const u8 = binBuffer instanceof Uint8Array ? binBuffer : new Uint8Array(binBuffer);
+      const results = await Promise.allSettled((meta.tiles || []).map(async (tile) => {
+        if (!Number.isInteger(tile.offset) || !Number.isInteger(tile.length) || tile.offset < 0 ||
+            tile.length <= 0 || tile.offset + tile.length > u8.length) {
+          throw new Error('The host sent an incomplete desktop tile.');
+        }
+        const bytes = u8.subarray(tile.offset, tile.offset + tile.length);
+        const mime = tile.format === 'png' ? 'image/png' : 'image/jpeg';
+        const bmp = await createImageBitmap(new Blob([bytes], { type: mime }));
+        decoded.push({ bmp, tile });
+      }));
+      if (generation !== sessionGeneration) return;
+      const failure = results.find(result => result.status === 'rejected');
+      if (failure) throw failure.reason;
+      if (canvas.width !== screenW || canvas.height !== screenH) {
+        canvas.width = screenW;
+        canvas.height = screenH;
+      }
+      remoteDesktopWidth = screenW;
+      remoteDesktopHeight = screenH;
+      if (meta.full) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, screenW, screenH);
+      }
+      for (const { bmp, tile } of decoded) {
+        ctx.drawImage(bmp, tile.x, tile.y, tile.w, tile.h);
+      }
+      if (meta.privilege || meta.desktop) {
+        updateRemotePrivilegeBadges(meta.privilege || 'Standard', meta.desktop || 'Default');
+      }
+      $('desktopLoadingOverlay').classList.add('hidden');
+      orbit.send({ type: 'frame_ack', seq: meta.seq });
+    } catch (error) {
+      if (generation === sessionGeneration) {
+        showBanner(error.message || 'Could not draw the remote desktop. Reconnect to try again.');
+        orbit.send({ type: 'display_config', monitor: selectedMonitor });
+      }
+    } finally {
+      for (const { bmp } of decoded) bmp.close();
+    }
+  }
 
   // ============================================================================
   // Mouse & Keyboard Input Forwarding
@@ -460,11 +558,17 @@
   function mapCanvasCoords(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
-    const relX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const relY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    const scale = Math.min(rect.width / remoteDesktopWidth, rect.height / remoteDesktopHeight);
+    const width = remoteDesktopWidth * scale;
+    const height = remoteDesktopHeight * scale;
+    const left = rect.left + (rect.width - width) / 2;
+    const top = rect.top + (rect.height - height) / 2;
+    const relX = (clientX - left) / width;
+    const relY = (clientY - top) / height;
     return {
-      x: Math.round(relX * remoteDesktopWidth),
-      y: Math.round(relY * remoteDesktopHeight)
+      x: Math.max(0, Math.min(1, relX)),
+      y: Math.max(0, Math.min(1, relY)),
+      inside: relX >= 0 && relX <= 1 && relY >= 0 && relY <= 1
     };
   }
 
@@ -475,65 +579,63 @@
   }
 
   let lastMoveSent = 0;
-  canvas.addEventListener('mousemove', (e) => {
+  let moveTimer = null;
+  let pendingMove = null;
+  function sendPendingMove() {
+    moveTimer=null;
+    if(!pendingMove||!inSession)return;
+    orbit.send(pendingMove);pendingMove=null;lastMoveSent=performance.now();
+  }
+  // pointerrawupdate arrives as soon as the OS reports a move; mousemove waits for the next screen refresh.
+  canvas.addEventListener('onpointerrawupdate' in window ? 'pointerrawupdate' : 'mousemove', (e) => {
     if (!inSession) return;
-    const now = performance.now();
-    if (now - lastMoveSent < 8) return;
-    lastMoveSent = now;
     const pt = mapCanvasCoords(e.clientX, e.clientY);
-    orbit.send({
-      type: 'input_mouse',
-      action: 'move',
-      x: pt.x,
-      y: pt.y,
-      w: remoteDesktopWidth,
-      h: remoteDesktopHeight
-    });
+    if (!pt.inside) return;
+    pendingMove={type:'mouse',action:'move',x:pt.x,y:pt.y};
+    const remaining=4-(performance.now()-lastMoveSent);
+    if(remaining<=0){if(moveTimer)clearTimeout(moveTimer);sendPendingMove();}
+    else if(!moveTimer)moveTimer=setTimeout(sendPendingMove,remaining);
   });
 
   canvas.addEventListener('mousedown', (e) => {
     if (!inSession) return;
     $('desktopViewport').focus();
+    if(moveTimer)clearTimeout(moveTimer);sendPendingMove();
     const pt = mapCanvasCoords(e.clientX, e.clientY);
+    if (!pt.inside) return;
+    heldButtons.add(mapMouseButton(e.button));
     orbit.send({
-      type: 'input_mouse',
+      type: 'mouse',
       action: 'down',
       button: mapMouseButton(e.button),
       x: pt.x,
-      y: pt.y,
-      w: remoteDesktopWidth,
-      h: remoteDesktopHeight
+      y: pt.y
     });
   });
 
   canvas.addEventListener('mouseup', (e) => {
     if (!inSession) return;
     const pt = mapCanvasCoords(e.clientX, e.clientY);
+    heldButtons.delete(mapMouseButton(e.button));
     orbit.send({
-      type: 'input_mouse',
+      type: 'mouse',
       action: 'up',
       button: mapMouseButton(e.button),
       x: pt.x,
-      y: pt.y,
-      w: remoteDesktopWidth,
-      h: remoteDesktopHeight
+      y: pt.y
     });
   });
 
-  canvas.addEventListener('dblclick', (e) => {
-    if (!inSession) return;
-    const pt = mapCanvasCoords(e.clientX, e.clientY);
-    orbit.send({
-      type: 'input_mouse',
-      action: 'dblclick',
-      button: 'left',
-      x: pt.x,
-      y: pt.y,
-      w: remoteDesktopWidth,
-      h: remoteDesktopHeight
-    });
+  window.addEventListener('blur', () => {
+    for(const vk of heldKeys)orbit.send({type:'key',vk,action:'up',modifiers:0});
+    for(const button of heldButtons)orbit.send({type:'mouse',button,action:'release'});
+    heldKeys.clear();heldButtons.clear();
   });
-
+  window.addEventListener('mouseup', (e) => {
+    if(e.target===canvas)return;
+    const button=mapMouseButton(e.button);
+    if(heldButtons.delete(button))orbit.send({type:'mouse',button,action:'release'});
+  });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   canvas.addEventListener(
@@ -542,16 +644,14 @@
       if (!inSession) return;
       e.preventDefault();
       const pt = mapCanvasCoords(e.clientX, e.clientY);
-      const delta = e.deltaY < 0 ? 120 : -120;
-      orbit.send({
-        type: 'input_mouse',
-        action: 'wheel',
-        delta,
-        x: pt.x,
-        y: pt.y,
-        w: remoteDesktopWidth,
-        h: remoteDesktopHeight
-      });
+      if (!pt.inside) return;
+      // Send the real amount (about 100 px per notch = Windows' 120), both directions, so trackpads don't flood the PC.
+      const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 120 : 1.2;
+      const clamp = (v) => Math.max(-120, Math.min(120, Math.round(v * unit)));
+      const deltaY = clamp(-e.deltaY);
+      const deltaX = clamp(e.deltaX);
+      if (!deltaY && !deltaX) return;
+      orbit.send({ type: 'mouse', action: 'wheel', deltaY, deltaX, x: pt.x, y: pt.y });
     },
     { passive: false }
   );
@@ -608,6 +708,13 @@
     Quote: 0xde
   };
 
+  const isMac = navigator.platform.startsWith('Mac');
+  // A Mac reports Caps Lock "down" when it turns on and "up" when it turns off; Windows needs a full press each time.
+  function tapCapsLock() {
+    orbit.send({ type: 'key', vk: 0x14, action: 'down', modifiers: 0 });
+    orbit.send({ type: 'key', vk: 0x14, action: 'up', modifiers: 0 });
+  }
+
   function getWindowsVk(e) {
     if (CODE_TO_VK[e.code]) return CODE_TO_VK[e.code];
     if (e.code && e.code.startsWith('Key') && e.code.length === 4) {
@@ -623,8 +730,10 @@
     if (!inSession || $('tabDesktop').classList.contains('hidden')) return;
     e.preventDefault();
     const vk = getWindowsVk(e);
+    if (isMac && vk === 0x14) { tapCapsLock(); return; }
     if (vk > 0) {
-      orbit.send({ type: 'input_key', vk, down: true });
+      heldKeys.add(vk);
+      orbit.send({ type: 'key', vk, action: 'down', modifiers:(e.shiftKey?1:0)|((e.ctrlKey||e.metaKey)?2:0)|(e.altKey?4:0) });
     }
   });
 
@@ -632,8 +741,18 @@
     if (!inSession || $('tabDesktop').classList.contains('hidden')) return;
     e.preventDefault();
     const vk = getWindowsVk(e);
+    if (isMac && vk === 0x14) { tapCapsLock(); return; }
     if (vk > 0) {
-      orbit.send({ type: 'input_key', vk, down: false });
+      heldKeys.delete(vk);
+      orbit.send({ type: 'key', vk, action: 'up', modifiers:(e.shiftKey?1:0)|((e.ctrlKey||e.metaKey)?2:0)|(e.altKey?4:0) });
+    }
+    // macOS sends no keyup for keys pressed while Cmd was held, so let go of them when Cmd is released.
+    if (isMac && e.key === 'Meta') {
+      for (const held of [...heldKeys]) {
+        if (held >= 0x10 && held <= 0x12) continue;
+        heldKeys.delete(held);
+        orbit.send({ type: 'key', vk: held, action: 'up', modifiers: 0 });
+      }
     }
   });
 
@@ -641,26 +760,31 @@
   // Session Toolbar Actions
   // ============================================================================
   $('sasBtn').addEventListener('click', () => {
-    orbit.send({ type: 'power_action', action: 'sas' });
-    showBanner('Sent Ctrl+Alt+Del to PC.');
+    orbit.send({ type: 'sas' });
+    showBanner('Sent Ctrl+Alt+Del (Secure Attention Sequence) to PC.');
   });
 
-  $('curtainBtn').addEventListener('click', () => {
-    privacyCurtainEnabled = !privacyCurtainEnabled;
-    orbit.send({ type: 'privacy_curtain', enabled: privacyCurtainEnabled });
-    $('curtainBtn').textContent = privacyCurtainEnabled ? 'Unblank PC' : 'Blank PC';
+  $('sessionMonitorSelect').addEventListener('change', async (event) => {
+    selectedMonitor = Number(event.target.value);
+    if(gpuSession){try{if($('sessionQualitySelect').value==='crisp')await startGpuVideo();else await orbit.selectVideoMonitor(selectedMonitor);}catch(error){showBanner(error.message);}return;}
+    $('desktopLoadingOverlay').classList.remove('hidden');
+    orbit.send({ type: 'display_config', monitor: selectedMonitor, quality: $('sessionQualitySelect').value });
   });
 
   $('fitWindowBtn').addEventListener('click', () => {
+    if(gpuSession){canvas.style.width='100%';canvas.style.height='100%';return;}
+
     const vp = $('desktopViewport').getBoundingClientRect();
     const w = Math.max(1024, Math.round(vp.width));
     const h = Math.max(720, Math.round(vp.height));
-    orbit.send({ type: 'set_resolution', width: w, height: h });
-    showBanner(`Requested resolution ${w}×${h}.`);
+    orbit.send({ type: 'display_config', monitor: selectedMonitor, width: w, height: h });
+    showBanner(`Requested PC display resolution ${w}×${h}.`);
   });
 
-  $('sessionQualitySelect').addEventListener('change', (e) => {
-    orbit.send({ type: 'set_quality', quality: e.target.value, monitor: 0 });
+  $('sessionQualitySelect').addEventListener('change', async (e) => {
+    if(gpuSession){try{await startGpuVideo();}catch(error){showBanner(error.message);}return;}
+
+    orbit.send({ type: 'display_config', quality: e.target.value, monitor: selectedMonitor });
   });
 
   $('syncClipBtn').addEventListener('click', async () => {
@@ -683,7 +807,7 @@
     const shell = $('termShellSelect').value;
     appendTerm(`\nPS> ${cmd}\n`);
     $('termInput').value = '';
-    orbit.send({ type: 'terminal_exec', command: cmd, shell });
+    orbit.send({ type: 'exec_cmd', command: cmd, shell });
   });
 
   $('termInput').addEventListener('keydown', (e) => {
@@ -695,15 +819,15 @@
   });
 
   $('fileDrivesBtn').addEventListener('click', () => {
-    orbit.send({ type: 'file_list', path: '' });
+    orbit.send({ type: 'fs_list', path: '' });
   });
 
   $('fileUpBtn').addEventListener('click', () => {
-    orbit.send({ type: 'file_list', path: currentFileParentPath || '' });
+    orbit.send({ type: 'fs_list', path: currentFileParentPath || '' });
   });
 
   $('fileRefreshBtn').addEventListener('click', () => {
-    orbit.send({ type: 'file_list', path: currentFilePath || '' });
+    orbit.send({ type: 'fs_list', path: currentFilePath || '' });
   });
 
   $('fileUploadBtn').addEventListener('click', async () => {
@@ -718,24 +842,25 @@
   });
 
   $('procRefreshBtn').addEventListener('click', () => {
-    orbit.send({ type: 'process_list' });
+    orbit.send({ type: 'proc_list' });
   });
 
   $('powerLockBtn').addEventListener('click', () => {
-    orbit.send({ type: 'power_action', action: 'lock' });
+    orbit.send({ type: 'sys_power', action: 'lock' });
     showBanner('Locked Windows PC.');
   });
 
   $('powerRestartBtn').addEventListener('click', () => {
-    orbit.send({ type: 'power_action', action: 'restart' });
+    orbit.send({ type: 'sys_power', action: 'restart' });
     showBanner('Restarting Windows PC in 5 seconds...');
   });
 
   orbit.onEvent((msg) => {
-    if (msg.type === 'terminal_result') {
+    if(msg.error){showBanner(msg.error);return;}
+    if (msg.type === 'exec_result') {
       if (msg.stdout) appendTerm(msg.stdout);
       if (msg.stderr) appendTerm(msg.stderr);
-    } else if (msg.type === 'file_list_result') {
+    } else if (msg.type === 'fs_list_result') {
       currentFilePath = msg.path || '';
       currentFileParentPath = msg.parent || '';
       $('fileCurrentPath').textContent = currentFilePath || 'Computer (Drives)';
@@ -761,7 +886,7 @@
           openBtn.className = 'sh-btn sh-btn-outline sh-btn-sm';
           openBtn.textContent = 'Open';
           openBtn.addEventListener('click', () => {
-            orbit.send({ type: 'file_list', path: item.path });
+            orbit.send({ type: 'fs_list', path: item.path });
           });
           right.appendChild(openBtn);
         } else {
@@ -775,8 +900,8 @@
           dlBtn.className = 'sh-btn sh-btn-outline sh-btn-sm';
           dlBtn.textContent = 'Download';
           dlBtn.addEventListener('click', () => {
-            orbit.send({ type: 'file_download', path: item.path });
-            showBanner(`Downloading ${item.name}...`);
+            orbit.send({ type: 'fs_download', path: item.path });
+            showBanner(`Downloading ${item.name} to Downloads...`);
           });
           right.appendChild(dlBtn);
         }
@@ -785,16 +910,16 @@
         row.appendChild(right);
         container.appendChild(row);
       }
-    } else if (msg.type === 'file_saved_local') {
-      showBanner(`Downloaded to ${msg.savedTo}`);
-    } else if (msg.type === 'file_upload_result') {
+    } else if (msg.type === 'download_saved') {
+      showBanner(`Downloaded to ${msg.path}`);
+    } else if (msg.type === 'fs_upload_result') {
       if (msg.ok) {
         showBanner('Upload complete.');
-        orbit.send({ type: 'file_list', path: currentFilePath });
+        orbit.send({ type: 'fs_list', path: currentFilePath });
       } else {
         showBanner(msg.error || 'Upload failed.');
       }
-    } else if (msg.type === 'process_list_result') {
+    } else if (msg.type === 'proc_list_result') {
       const container = $('procListContainer');
       container.innerHTML = '';
       const procs = msg.processes || [];
@@ -816,8 +941,8 @@
         killBtn.className = 'sh-btn sh-btn-outline sh-btn-sm';
         killBtn.textContent = 'End Task';
         killBtn.addEventListener('click', () => {
-          orbit.send({ type: 'process_kill', pid: p.pid });
-          setTimeout(() => orbit.send({ type: 'process_list' }), 400);
+          orbit.send({ type: 'proc_kill', pid: p.pid });
+          setTimeout(() => orbit.send({ type: 'proc_list' }), 400);
         });
 
         row.appendChild(left);
@@ -830,9 +955,11 @@
   // ============================================================================
   // Bootstrap
   // ============================================================================
+  document.addEventListener('visibilitychange',()=>video?.setVisible(!document.hidden&&!$('tabDesktop').classList.contains('hidden')));
   async function init() {
     const info = await orbit.getAppInfo();
     isWindows = Boolean(info.isWindows);
+    $('sessionQualitySelect').value=info.clientConfig?.qualityMode || 'balanced';
 
     if (!isWindows) {
       $('modeHostBtn').classList.add('hidden');

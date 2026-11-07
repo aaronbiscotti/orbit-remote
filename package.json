@@ -10,11 +10,18 @@
     "start": "electron .",
     "smoke": "electron . --smoke-test",
     "dist:win": "electron-builder --win nsis zip --x64 --publish never",
-    "dist:mac": "electron-builder --mac dmg zip --universal --publish never"
+    "dist:mac": "electron-builder --mac dmg zip --arm64 --publish never",
+    "build:video:mac": "bash scripts/build-video-mac.sh",
+    "test:video": "node --test tests/video-session.test.js tests/video-renderer.test.js tests/native-video-session.test.js",
+    "dist:mac:gpu": "npm run build:video:mac && electron-builder --mac zip --arm64",
+    "test": "node --test \"tests/*.test.js\""
   },
   "build": {
     "appId": "local.orbit.remote",
     "productName": "Orbit",
+    "electronLanguages": [
+      "en"
+    ],
     "directories": {
       "output": "dist/electron"
     },
@@ -24,43 +31,64 @@
       "LICENSE",
       "NOTICE"
     ],
-    "extraResources": [
-      {
-        "from": "dist/Orbit-Host",
-        "to": "engine",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "scripts",
-        "to": "scripts",
-        "filter": ["*.ps1"]
-      }
-    ],
     "mac": {
-      "icon": "electron/assets/icon.png",
+      "icon": "electron/assets/icon.icns",
       "category": "public.app-category.utilities",
       "target": [
         {
           "target": "dmg",
-          "arch": ["universal"]
+          "arch": [
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["universal"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
-      "identity": null
+      "identity": null,
+      "extraResources": [
+        {
+          "from": "dist/video-engine",
+          "to": "video-engine",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
     },
     "win": {
       "icon": "electron/assets/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "dist/Orbit-Host",
+          "to": "engine",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "scripts",
+          "to": "scripts",
+          "filter": [
+            "*.ps1"
+          ]
         }
       ]
     },

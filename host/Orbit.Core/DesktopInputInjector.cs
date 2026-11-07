@@ -36,6 +36,13 @@ public static class DesktopInputInjector
         if (!OperatingSystem.IsWindows()) return;
         _ = SecureDesktopManager.AttachThreadToInputDesktop();
 
+        // 'release' (the Mac window lost focus) only lets go of the button. It must not move the pointer.
+        if (string.Equals(action, "release", StringComparison.OrdinalIgnoreCase))
+        {
+            SendMouseSingle(0, 0, ButtonFlag(button, down: false), 0);
+            return;
+        }
+
         var monitors = DesktopCaptureEngine.GetMonitors();
         if (monitorIndex < 0 || monitorIndex >= monitors.Count) monitorIndex = 0;
         var mon = monitors[monitorIndex];

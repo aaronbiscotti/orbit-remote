@@ -27,6 +27,21 @@ if ($existingService) {
 Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
 
+# Run the SYSTEM service from a folder only administrators can change. The per-user copy lives under
+# %APPDATA%, which any program running as this user could rewrite to gain SYSTEM rights.
+$userConfigDir = Join-Path $engineRoot 'config'
+$secureRoot = Join-Path $env:ProgramFiles 'Orbit\Engine'
+New-Item -ItemType Directory -Force -Path $secureRoot | Out-Null
+Get-ChildItem -LiteralPath $engineRoot -File | Copy-Item -Destination $secureRoot -Force
+# Settings, certificate and pairings are copied only the first time, so pairings made later through the service are kept.
+$secureConfigDir = Join-Path $secureRoot 'config'
+if (!(Test-Path -LiteralPath $secureConfigDir)) { Copy-Item -LiteralPath $userConfigDir -Destination $secureConfigDir -Recurse }
+$engineRoot = $secureRoot
+$exe = Join-Path $secureRoot 'sunshine.exe'
+$serviceExe = Join-Path $secureRoot 'Orbit.Host.exe'
+if (!(Test-Path -LiteralPath $serviceExe)) { $serviceExe = $exe }
+$config = Join-Path $secureConfigDir 'sunshine.conf'
+
 # Register and start persistent LocalSystem service (OrbitHostService)
 $binPath = "`"$serviceExe`" --service"
 if (!$existingService) {
@@ -46,5 +61,5 @@ if ($runningAfterService.Count -eq 0) {
     } finally { $orbitStarted.Dispose() }
 }
 
-[IO.File]::WriteAllText((Join-Path $engineRoot 'config\administrator-control.enabled'), 'Administrator and SYSTEM UAC takeover requested by this PC owner.')
+[IO.File]::WriteAllText((Join-Path $userConfigDir 'administrator-control.enabled'), 'Administrator and SYSTEM UAC takeover requested by this PC owner.')
 Write-Output 'Administrator and UAC Secure Desktop takeover started. Reconnect from your Mac.'
