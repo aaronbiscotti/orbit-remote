@@ -332,7 +332,20 @@ textarea {
 .hero-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+}
+
+.hero-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex-shrink: 0;
+  transition: transform 320ms var(--spring-bounce);
+}
+
+.hero-title-row:hover .hero-logo {
+  transform: scale(1.08) rotate(-4deg);
 }
 
 .brand-name {
