@@ -28,7 +28,8 @@ jobs:
         run: npm install
       - name: Stamp the build number into the app
         shell: bash
-        run: echo "{\"run\": ${{ github.run_number }}, \"commit\": \"${GITHUB_SHA::7}\"}" > electron/build-info.json
+        run: |
+          echo "{\"run\": ${{ github.run_number }}, \"commit\": \"${GITHUB_SHA::7}\"}" > electron/build-info.json
       - name: Smoke test Electron app
         run: npm run smoke
       - name: Build Windows Electron Installer (Setup.exe & ZIP)
@@ -55,7 +56,8 @@ jobs:
         run: npm install
       - name: Stamp the build number into the app
         shell: bash
-        run: echo "{\"run\": ${{ github.run_number }}, \"commit\": \"${GITHUB_SHA::7}\"}" > electron/build-info.json
+        run: |
+          echo "{\"run\": ${{ github.run_number }}, \"commit\": \"${GITHUB_SHA::7}\"}" > electron/build-info.json
       - name: Smoke test Electron app
         run: npm run smoke
       - name: Build Universal macOS Electron Installer (.dmg & .zip)
