@@ -17,15 +17,16 @@ try {
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'SoftwareSASGeneration' -Value 3 -Type DWord -Force -ErrorAction SilentlyContinue
 } catch {}
 
-# Stop existing service and ALL running sunshine/Orbit.Host instances across the PC so ports 47990/47995 and DLLs are freed
+# Stop the service and Orbit's own engine processes so ports 47990/47995 and the engine files are freed
 $serviceName = 'OrbitHostService'
 $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if ($existingService) {
     & sc.exe stop $serviceName | Out-Null
     Start-Sleep -Milliseconds 600
 }
-<<<<<<< Updated upstream
-Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# Only Orbit's own engine copies: the real Sunshine, which Moonlight needs, is also called sunshine.exe.
+$orbitDirs = @($engineRoot, (Join-Path $env:ProgramFiles 'Orbit\Engine')) | ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd('\') + '\' }
+Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Where-Object { $p = $_.Path; $p -and ($orbitDirs | Where-Object { $p.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }) } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 600
 
 # Refresh $engineRoot from authoritative packaged engine while all processes are stopped (prevents locked-DLL version mismatches)
@@ -46,12 +47,6 @@ foreach ($cand in $authoritativeCandidates) {
         break
     }
 }
-=======
-# Only Orbit's own engine copies: the real Sunshine, which Moonlight needs, is also called sunshine.exe.
-$orbitDirs = @($engineRoot, (Join-Path $env:ProgramFiles 'Orbit\Engine')) | ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd('\') + '\' }
-Get-Process -Name 'sunshine','Orbit.Host' -ErrorAction SilentlyContinue | Where-Object { $p = $_.Path; $p -and ($orbitDirs | Where-Object { $p.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }) } | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 500
->>>>>>> Stashed changes
 
 # Run the SYSTEM service from a folder only administrators can change. The per-user copy lives under
 # %APPDATA%, which any program running as this user could rewrite to gain SYSTEM rights.
