@@ -16,8 +16,9 @@ function streamArgs(profile) {
   return ['stream', `${host}:${clamp(profile.port, SUNSHINE_BASE_PORT, 1, 65535)}`, 'Desktop',
     '--resolution', `${clamp(profile.width,1920,640,3840)}x${clamp(profile.height,1080,480,2160)}`,
     '--fps', String(clamp(profile.fps,120,30,120)), '--bitrate', String(clamp(profile.bitrate,10000,3000,40000)),
-    // Full screen lets macOS show frames without compositing the window first.
-    '--display-mode', 'borderless', '--video-codec', 'HEVC', '--video-decoder', 'hardware',
+    // Full screen lets macOS show frames without compositing the window first. Not 'borderless': that is a macOS
+    // full-screen Space, where macOS 26 can report wrong pointer positions along the top edge (see SDL's mouseMoved).
+    '--display-mode', 'fullscreen', '--video-codec', 'HEVC', '--video-decoder', 'hardware',
     '--absolute-mouse', '--no-vsync', '--no-frame-pacing', '--no-game-optimization',
     '--no-quit-after', '--capture-system-keys', 'fullscreen', '--no-hdr', '--no-yuv444'];
 }

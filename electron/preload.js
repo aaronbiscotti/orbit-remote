@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('orbit', {
   closeWindow: () => ipcRenderer.invoke('window:close'),
   copyText: (text) => ipcRenderer.invoke('app:copy-text', { text }),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', { url }),
+  setStreamShortcut: (action, accelerator) => ipcRenderer.invoke('settings:set-stream-shortcut', { action, accelerator }),
 
   // Windows Host Mode APIs
   getHostStatus: () => ipcRenderer.invoke('host:get-status'),

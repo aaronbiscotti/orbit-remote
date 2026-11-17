@@ -56,6 +56,16 @@
     <div class="popover-divider"></div>
 
     <div class="popover-rows">
+      <div class="setting-row mac-only">
+        <span class="setting-name">Release mouse and keys</span>
+        <button type="button" class="soft-pill-btn sh-btn-sm shortcut-btn" data-shortcut="release" title="Brings Orbit to the front while the stream keeps running. Click, then press the new keys."></button>
+      </div>
+
+      <div class="setting-row mac-only">
+        <span class="setting-name">Close the stream</span>
+        <button type="button" class="soft-pill-btn sh-btn-sm shortcut-btn" data-shortcut="close" title="Closes the stream window. Click, then press the new keys."></button>
+      </div>
+
       <div class="setting-row">
         <span class="setting-name">Tactile UI sounds</span>
         <label class="sh-switch" title="Subtle acoustic feedback on clicks and toggles">
@@ -310,7 +320,8 @@
           <p id="externalStreamStatus">Opening stream window…</p>
           <button id="openStreamWindowBtn" class="accent-pill-btn">Open stream window</button>
           <p class="footer-muted">For a pointer with no delay, press Control + Option + Shift + C each time the stream opens. Control + Option + Shift + N hides the PC's own pointer; the PC remembers that until you press it again.</p>
-          <p class="footer-muted">The stream opens full screen. With Control + Option + Shift held: X switches to a window, Z frees your mouse and keys, Q stops the stream, F1 / F2 switch PC displays.</p>
+          <p class="footer-muted">The stream opens full screen. <span id="streamShortcutHint"></span> Change both in Settings.</p>
+          <p class="footer-muted">With Control + Option + Shift held: X switches the stream to a window, F1 / F2 switch PC displays.</p>
           <p class="footer-muted">Files and Terminal stay here in Orbit.</p>
         </div>
         <div id="desktopLoadingOverlay" class="desktop-overlay">
@@ -403,6 +414,7 @@
   </div>
 
   <script src="video-renderer.js"></script>
+  <script src="shortcut-keys.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

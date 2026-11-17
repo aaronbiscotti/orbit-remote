@@ -1260,3 +1260,15 @@ textarea {
 .mac .titlebar-controls {
   display: none;
 }
+
+/* Stream shortcuts only exist on the Mac, where the stream opens in Moonlight's own window. */
+.setting-row.mac-only {
+  display: none;
+}
+.mac .setting-row.mac-only {
+  display: flex;
+}
+.shortcut-btn {
+  min-width: 84px;
+  letter-spacing: 0.06em;
+}

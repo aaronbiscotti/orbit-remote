@@ -8,7 +8,7 @@ const quiet = async () => ''; // never touch the real Moonlight preferences in t
 test('native player opens full screen with hardware decode and desktop mouse mapping', () => {
   const args = streamArgs({host:'192.168.1.64',port:48989,fps:120,bitrate:12000});
   assert.deepEqual(args.slice(0,3), ['stream','192.168.1.64:48989','Desktop']);
-  for (const [flag, value] of [['--display-mode','borderless'],['--video-decoder','hardware'],['--fps','120']]) {
+  for (const [flag, value] of [['--display-mode','fullscreen'],['--video-decoder','hardware'],['--fps','120']]) {
     assert.equal(args[args.indexOf(flag)+1], value);
   }
   assert.ok(args.includes('--absolute-mouse'));

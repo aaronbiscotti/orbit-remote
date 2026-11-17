@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, clipboard, dialog, powerSaveBlocker, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, dialog, globalShortcut, powerSaveBlocker, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -10,7 +10,10 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const { VideoSession } = require('./video-session');
 const { NativeVideoSession } = require('./native-video-session');
 const { ENGINE_ADMIN_PORT, ENGINE_TAKEOVER_PORT } = require('./ports');
+const { isValidAccelerator } = require('./shortcut-keys');
 
+// Mac stream shortcuts. The defaults are the keys Moonlight itself uses for the same two actions.
+const DEFAULT_STREAM_SHORTCUTS = { release: 'Control+Alt+Shift+Z', close: 'Control+Alt+Shift+Q' };
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isWindows = process.platform === 'win32';
@@ -241,6 +244,8 @@ function loadClientConfig() {
     cfg.mapCommandToCtrl = true;
     changed = true;
   }
+  cfg.streamShortcuts = Object.fromEntries(Object.entries(DEFAULT_STREAM_SHORTCUTS).map(([action, fallback]) =>
+    [action, isValidAccelerator(cfg.streamShortcuts?.[action]) ? cfg.streamShortcuts[action] : fallback]));
   cfg.tokenHashHex = crypto
     .createHash('sha256')
     .update(Buffer.from(cfg.secretHex, 'hex'))
@@ -257,6 +262,7 @@ function saveClientConfig(cfg) {
     secretHex: cfg.secretHex,
     qualityMode: cfg.qualityMode,
     mapCommandToCtrl: cfg.mapCommandToCtrl,
+    streamShortcuts: cfg.streamShortcuts,
     computers: cfg.computers
   };
   fs.writeFileSync(getClientConfigPath(), JSON.stringify(copy, null, 2), 'utf8');
@@ -497,6 +503,45 @@ function queueVideoOperation(fn) {
   videoOperation = next;
   return next;
 }
+
+// In the stream, Moonlight takes the keyboard and keeps the pointer inside the picture, so these are the way out.
+// Orbit registers them with macOS only while a stream is open; the keys stay free for other apps otherwise.
+let streamShortcutsOn = [];
+function releaseStream() {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  app.focus({ steal: true }); // Moonlight lets go of the keyboard and pointer once it is no longer the front app.
+}
+function closeStream() {
+  const session = videoSession;
+  if (!session?.external) return;
+  releaseStream();
+  queueVideoOperation(async () => {
+    await session.stop(); // Asks Moonlight to quit, and force-quits it if it hasn't after 2.5 seconds.
+    if (videoSession === session && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video:status', { type: 'closed', message: 'Stream window closed.' });
+    }
+  }).catch((error) => console.log('ORBIT_STREAM_CLOSE', error.message));
+}
+function setStreamShortcuts(on) {
+  for (const accelerator of streamShortcutsOn) globalShortcut.unregister(accelerator);
+  streamShortcutsOn = [];
+  if (!on) return;
+  const { release, close } = loadClientConfig().streamShortcuts;
+  for (const [accelerator, run] of [[release, releaseStream], [close, closeStream]]) {
+    if (globalShortcut.register(accelerator, run)) streamShortcutsOn.push(accelerator);
+    else console.log('ORBIT_SHORTCUT_REFUSED', accelerator);
+  }
+}
+// True if macOS will register the shortcut. It can refuse one, for example a key it reserves.
+function macAcceptsShortcut(accelerator) {
+  if (globalShortcut.isRegistered(accelerator)) return true;
+  const accepted = globalShortcut.register(accelerator, () => {});
+  if (accepted) globalShortcut.unregister(accelerator);
+  return accepted;
+}
+
 async function ensureControlSession() {
   if(!sessionAddress)throw new Error('No active PC session.');
   if(sessionSocket && !sessionSocket.destroyed)return;
@@ -594,12 +639,27 @@ function registerIpcHandlers() {
         });
       }
     }
+    const { qualityMode, streamShortcuts } = loadClientConfig();
     return {
       platform: process.platform,
       isWindows,
       network: getNetworkAddresses(),
-      clientConfig: { qualityMode: loadClientConfig().qualityMode }
+      clientConfig: { qualityMode, streamShortcuts }
     };
+  });
+
+  ipcMain.handle('settings:set-stream-shortcut', (_event, { action, accelerator } = {}) => {
+    if (!Object.hasOwn(DEFAULT_STREAM_SHORTCUTS, action)) throw new Error('Unknown shortcut.');
+    if (!isValidAccelerator(accelerator)) throw new Error('Use Control or Command, plus a letter, number or function key.');
+    const cfg = loadClientConfig();
+    if (Object.entries(cfg.streamShortcuts).some(([other, used]) => other !== action && used === accelerator)) {
+      throw new Error('The other stream shortcut already uses those keys.');
+    }
+    if (!macAcceptsShortcut(accelerator)) throw new Error('macOS did not accept that shortcut. Try different keys.');
+    cfg.streamShortcuts[action] = accelerator;
+    saveClientConfig(cfg);
+    if (streamShortcutsOn.length) setStreamShortcuts(true); // a stream is open: switch to the new keys now
+    return { streamShortcuts: cfg.streamShortcuts };
   });
 
   // --- Windows Host Mode Handlers ---
@@ -1097,7 +1157,12 @@ function registerIpcHandlers() {
       current.on('status', status => {
         if (videoSession === current && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('video:status', status);
       });
-      try { return await current.start(); }
+      try {
+        const info = await current.start();
+        setStreamShortcuts(true);
+        current.child?.once('close', () => setStreamShortcuts(false));
+        return info;
+      }
       catch (error) { await current.stop(); if(videoSession === current) videoSession = null; throw error; }
     }
     const helper = app.isPackaged ? path.join(process.resourcesPath, 'video-engine', 'orbit-video-bridge') : path.join(getRepoOrResourceRoot(), 'work/video-bridge-build/orbit-video-bridge');

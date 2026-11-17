@@ -1116,7 +1116,36 @@
     backdrop.classList.toggle('hidden', !open);
     gearBtn.classList.toggle('is-open', open);
     gearBtn.setAttribute('aria-expanded', String(open));
+    if (!open) showStreamShortcuts(); // stop waiting for a key press
   }
+
+  // Settings: the two Mac stream shortcuts. Click one, then press the new keys. Esc cancels.
+  let streamShortcuts = {};
+  let recordingShortcut = null; // the button waiting for a key press
+  function showStreamShortcuts(shortcuts = streamShortcuts) {
+    streamShortcuts = shortcuts;
+    recordingShortcut = null;
+    const keys = (action) => OrbitShortcuts.formatAccelerator(streamShortcuts[action]);
+    document.querySelectorAll('.shortcut-btn').forEach((btn) => { btn.textContent = keys(btn.dataset.shortcut); });
+    $('streamShortcutHint').textContent = `${keys('release')} brings you back to your Mac and ${keys('close')} closes the stream.`;
+  }
+  document.querySelectorAll('.shortcut-btn').forEach((btn) => btn.addEventListener('click', () => {
+    showStreamShortcuts();
+    recordingShortcut = btn;
+    btn.textContent = 'Press keys…';
+  }));
+  document.addEventListener('keydown', async (e) => {
+    if (!recordingShortcut) return;
+    e.preventDefault();
+    e.stopPropagation(); // keep Esc from also closing Settings
+    const accelerator = OrbitShortcuts.acceleratorFromKeyEvent(e);
+    if (!accelerator && e.key !== 'Escape') return; // only modifier keys are down so far
+    const action = recordingShortcut.dataset.shortcut;
+    showStreamShortcuts();
+    if (!accelerator) return;
+    try { showStreamShortcuts((await orbit.setStreamShortcut(action, accelerator)).streamShortcuts); }
+    catch (error) { showBanner(error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); }
+  }, true);
 
   $('checkUpdatesCircleBtn')?.addEventListener('click', () => {
     const isOpen = !$('settingsPopover')?.classList.contains('hidden');
@@ -1234,6 +1263,7 @@
     isWindows = Boolean(info.isWindows);
     const qMode = info.clientConfig?.qualityMode || 'crisp';
     syncQualityButtons(qMode);
+    showStreamShortcuts(info.clientConfig?.streamShortcuts);
 
     if (!isWindows) {
       $('modeHostBtn').classList.add('hidden');
